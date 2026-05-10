@@ -93,6 +93,52 @@ export async function chatCompletionJSON(
   return data.choices[0].message.content;
 }
 
+export async function chatCompletionWithImage(
+  textPrompt: string,
+  base64Image: string,
+  mimeType: string,
+  apiKey: string,
+  options: { temperature?: number; maxTokens?: number } = {}
+): Promise<string> {
+  const { temperature = 0.2, maxTokens = 256 } = options;
+
+  const response = await withTimeout(
+    fetch(`${BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature,
+        max_tokens: maxTokens,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}`, detail: 'low' } },
+              { type: 'text', text: textPrompt },
+            ],
+          },
+        ],
+      }),
+    }),
+    20000
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`OpenAI vision error ${response.status}: ${err}`);
+  }
+
+  const data = await withTimeout(
+    response.json() as Promise<{ choices: Array<{ message: { content: string } }> }>,
+    10000
+  );
+  return data.choices[0].message.content;
+}
+
 export async function detectFacialEmotion(
   base64Image: string,
   apiKey: string

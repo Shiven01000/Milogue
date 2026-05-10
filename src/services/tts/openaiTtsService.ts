@@ -12,7 +12,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
-export async function synthesizeSpeech(text: string, apiKey: string): Promise<Audio.Sound> {
+export async function synthesizeSpeech(text: string, apiKey: string, voice = 'fable'): Promise<Audio.Sound> {
   console.log('[TTS] fetch start');
   const response = await withTimeout(
     fetch(TTS_ENDPOINT, {
@@ -21,7 +21,7 @@ export async function synthesizeSpeech(text: string, apiKey: string): Promise<Au
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ model: 'tts-1', input: text, voice: 'fable', response_format: 'mp3' }),
+      body: JSON.stringify({ model: 'tts-1-hd', input: text, voice, response_format: 'mp3' }),
     }),
     20000,
     'fetch'

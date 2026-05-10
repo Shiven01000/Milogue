@@ -36,6 +36,9 @@ export interface PatientMemory {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   assignedDoctorName?: string;
+  preferredVoice?: 'male' | 'female' | 'custom';
+  clonedVoiceId?: string;
+  clonedVoiceName?: string;
 }
 
 export const DEFAULT_PATIENT_MEMORY: PatientMemory = {

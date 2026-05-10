@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { H2, H3, Body, BodySmall, Caption } from '@/components/common/Typography';
 import { Card } from '@/components/common/Card';
@@ -17,6 +19,8 @@ import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
 import { MedicationCandidate, MedicationExplanation, MedicationLanguageCode } from '@/types/medication';
 import { getMedicationSafetyBlockedMessage, isUnsafeMedicationQuestion } from '@/utils/medicationSafety';
+import { synthesizeSpeech } from '@/services/tts/openaiTtsService';
+import { Audio } from 'expo-av';
 import { chatCompletion, chatCompletionJSON } from '@/api/openai';
 import {
   buildMedicationExplanationFromCandidateMessages,
@@ -29,6 +33,7 @@ import {
   searchMedicationCandidatesFromOpenFda,
   searchMedicationCandidatesWithAI,
   fetchMedicationEntryWithAI,
+  identifyMedicationFromImage,
 } from '@/services/medications/openFdaService';
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
@@ -139,6 +144,21 @@ function LanguageDropdown({
   );
 }
 
+function buildTtsScript(explanation: MedicationExplanation): string {
+  const parts = [
+    explanation.medicationName + '.',
+    explanation.whatItDoes.content,
+    `Why doctors prescribe it. ${explanation.whyDoctorsPrescribe.content}`,
+    `Common side effects. ${explanation.commonSideEffects.items.join('. ')}.`,
+    `Serious side effects. ${explanation.seriousSideEffects.items.join('. ')}.`,
+    explanation.seriousSideEffects.contactDoctorText ?? '',
+    `Questions to ask your pharmacist or doctor. ${explanation.questionsToAskPharmacistOrDoctor.items.join('. ')}.`,
+    explanation.safetyDisclaimer,
+  ].filter(Boolean).join('\n\n');
+  // OpenAI TTS limit is 4096 chars
+  return parts.length > 4000 ? parts.slice(0, 4000) + '…' : parts;
+}
+
 export function MedicationKnowledgeScreen() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<MedicationCandidate | null>(null);
@@ -154,6 +174,9 @@ export function MedicationKnowledgeScreen() {
   const [language, setLanguage] = useState<MedicationLanguageCode>('en');
   const [translationLoading, setTranslationLoading] = useState(false);
 
+  const [scanning, setScanning] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
   const [question, setQuestion] = useState('');
   const [followupLoading, setFollowupLoading] = useState(false);
   const [followups, setFollowups] = useState<Array<{ id: string; question: string; answer: string; askedAt: number }>>([]);
@@ -164,11 +187,59 @@ export function MedicationKnowledgeScreen() {
     return translatedExplanation ?? baseExplanation;
   }, [baseExplanation, translatedExplanation, language]);
 
+  const handleScanCamera = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Camera permission needed', 'Allow camera access in Settings to scan a medication.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.6,
+      base64: true,
+    });
+
+    if (result.canceled || !result.assets[0]?.base64) return;
+
+    if (!OPENAI_API_KEY) {
+      Alert.alert('API key required', 'An OpenAI API key is needed to identify medications from photos.');
+      return;
+    }
+
+    setScanning(true);
+    setSearchError(null);
+    setCandidates([]);
+
+    try {
+      const { base64, mimeType } = result.assets[0];
+      const name = await identifyMedicationFromImage(base64!, mimeType ?? 'image/jpeg', OPENAI_API_KEY);
+      if (!name) {
+        setSearchError('Could not identify a medication in that photo. Try a clearer shot of the label or packaging.');
+        return;
+      }
+      setQuery(name);
+      const next = await searchMedicationCandidatesWithAI(name, OPENAI_API_KEY);
+      if (next.length === 0) {
+        setSearchError(`Identified "${name}" but couldn't find medication details. Try searching manually.`);
+      } else {
+        setCandidates(next);
+      }
+    } catch {
+      setSearchError('Something went wrong scanning the medication. Please try again.');
+    } finally {
+      setScanning(false);
+    }
+  }, []);
+
   const handleSelect = useCallback((candidate: MedicationCandidate) => {
     setSelected(candidate);
     setBaseExplanation(null);
     setTranslatedExplanation(null);
     setExplanationLoading(false);
+    const s = soundRef.current;
+    if (s) { soundRef.current = null; s.stopAsync().catch(() => {}); s.unloadAsync().catch(() => {}); }
+    setIsSpeaking(false);
     setQuestion('');
     setFollowups([]);
     setLanguage('en');
@@ -201,7 +272,7 @@ export function MedicationKnowledgeScreen() {
         if (!cancelled) {
           setCandidates(next);
           if (next.length === 0) {
-            setSearchError('No mental health medication matches found. Try different search terms.');
+            setSearchError('No medication matches found. Try a different spelling or brand name.');
           }
         }
       } catch {
@@ -328,6 +399,31 @@ export function MedicationKnowledgeScreen() {
     }
   }, [selected, baseExplanation, question, language]);
 
+  const handleToggleSpeech = useCallback(async () => {
+    if (isSpeaking) {
+      const s = soundRef.current;
+      if (s) { soundRef.current = null; await s.stopAsync().catch(() => {}); await s.unloadAsync().catch(() => {}); }
+      setIsSpeaking(false);
+      return;
+    }
+    if (!displayedExplanation || !OPENAI_API_KEY) return;
+    setIsSpeaking(true);
+    try {
+      const sound = await synthesizeSpeech(buildTtsScript(displayedExplanation), OPENAI_API_KEY, 'nova');
+      soundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate(status => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          if (soundRef.current === sound) soundRef.current = null;
+          setIsSpeaking(false);
+        }
+      });
+      await sound.playAsync();
+    } catch {
+      setIsSpeaking(false);
+    }
+  }, [isSpeaking, displayedExplanation]);
+
   if (!selected) {
     const trimmed = query.trim();
 
@@ -336,20 +432,34 @@ export function MedicationKnowledgeScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <H2 style={styles.title}>Medication Knowledge</H2>
           <Body color={colors.textSecondary} style={styles.subtitle}>
-            Search any medication you want to know about. You can translate the explanation and ask safe follow-up questions.
+            Search any medication. Translate the explanation or ask follow-up questions in your language.
           </Body>
 
           <Card style={styles.searchCard}>
             <Caption>Search any medication you want to know about</Caption>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Type a medicine name or brand (e.g., Zoloft)"
-              placeholderTextColor={colors.textTertiary}
-              style={styles.searchInput}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View style={styles.searchRow}>
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Type a medicine name or brand (e.g., ibuprofen, Zoloft)"
+                placeholderTextColor={colors.textTertiary}
+                style={styles.searchInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={handleScanCamera}
+                style={styles.cameraButton}
+                accessibilityRole="button"
+                accessibilityLabel="Scan medication with camera"
+                disabled={scanning}
+              >
+                {scanning
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Body style={styles.cameraIcon}>📷</Body>
+                }
+              </TouchableOpacity>
+            </View>
           </Card>
 
           {trimmed.length === 0 ? (
@@ -437,6 +547,19 @@ export function MedicationKnowledgeScreen() {
               />
             )}
           </Card>
+
+          {displayedExplanation && !explanationLoading && (
+            <TouchableOpacity
+              onPress={handleToggleSpeech}
+              style={[styles.listenBtn, isSpeaking && styles.listenBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={isSpeaking ? 'Stop reading' : 'Listen to explanation'}
+            >
+              <Body style={isSpeaking ? styles.listenBtnTextActive : styles.listenBtnText}>
+                {isSpeaking ? '⏹  Stop' : '🔊  Listen to explanation'}
+              </Body>
+            </TouchableOpacity>
+          )}
 
           {explanationLoading || !displayedExplanation ? (
             <View style={styles.loadingWrap}>
@@ -547,8 +670,9 @@ const styles = StyleSheet.create({
   title: { marginBottom: spacing.sm },
   subtitle: { lineHeight: 22, marginBottom: spacing.base },
   searchCard: { gap: spacing.sm },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   searchInput: {
-    marginTop: spacing.xs,
+    flex: 1,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderRadius: 12,
@@ -556,6 +680,17 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     color: colors.textPrimary,
   },
+  cameraButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraIcon: { fontSize: 20 },
   resultCard: { padding: spacing.base },
   separator: { height: spacing.sm },
   emptyCard: { padding: spacing.base },
@@ -605,6 +740,26 @@ const styles = StyleSheet.create({
   langMenu: { paddingVertical: spacing.xs, marginTop: spacing.xs, overflow: 'hidden' },
   langMenuItem: { paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, flexDirection: 'row' },
 
+  listenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryFaint,
+  },
+  listenBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  listenBtnText: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  listenBtnTextActive: {
+    color: '#fff',
+  },
   loadingWrap: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.base },
 
   section: { gap: spacing.xs, paddingVertical: spacing.base },

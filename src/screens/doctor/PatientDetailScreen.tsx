@@ -217,7 +217,6 @@ export function PatientDetailScreen() {
           .join('\n'),
         emotionTags: sess.emotionTags,
         emotionArc: sess.emotionTimeline ? formatEmotionArc(sess.emotionTimeline) : undefined,
-        sessionAvgHR: sess.sessionAvgHR,
       }));
       const healthPayload = healthData.map(h => ({
         date: h.date,
@@ -448,13 +447,7 @@ export function PatientDetailScreen() {
           {/* Wearable Trends */}
           {isConnected && healthRange.length > 0 && (
             <Card style={styles.section}>
-              <View style={styles.wearableHeaderRow}>
-                <H3 style={styles.sectionTitle}>Wearable Trends (7-Day)</H3>
-                <View style={styles.fitbitBadge}>
-                  <View style={styles.fitbitDot} />
-                  <Text style={styles.fitbitBadgeText}>Fitbit Charge 6</Text>
-                </View>
-              </View>
+              <H3 style={styles.sectionTitle}>Wearable Trends (7-Day)</H3>
               <WearableBarChart
                 data={healthRange}
                 getValue={s => s.hrv.morningHRV}
@@ -512,12 +505,6 @@ export function PatientDetailScreen() {
                 )}
                 {report && (
                   <View style={styles.reportPreview}>
-                    <View style={styles.wearableSourceRow}>
-                      <View style={styles.fitbitDot} />
-                      <BodySmall color={colors.textTertiary}>
-                        Wearable data source: Fitbit Charge 6 — synced during session
-                      </BodySmall>
-                    </View>
                     <View style={styles.reportStats}>
                       <View style={styles.reportStat}>
                         <H3 color={colors.primary}>{String(report.sessionCount)}</H3>
@@ -678,42 +665,6 @@ const styles = StyleSheet.create({
   content: { padding: spacing.base, paddingBottom: 100, gap: spacing.base },
   section: { gap: spacing.sm },
   sectionTitle: { marginBottom: spacing.xs },
-  wearableHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  fitbitBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(52,199,89,0.1)',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  fitbitDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34C759',
-  },
-  fitbitBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#34C759',
-  },
-  wearableSourceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.sm,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    backgroundColor: 'rgba(52,199,89,0.08)',
-    borderRadius: 10,
-  },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

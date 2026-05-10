@@ -12,6 +12,8 @@ export type RootStackParamList = {
   CheckinFlow: { sessionId?: string };
   CheckinSummary: { sessionId: string };
   IncomingCall: undefined;
+  VocabularyFlashcards: undefined;
+  VoiceCloning: undefined;
 };
 
 export type TabParamList = {

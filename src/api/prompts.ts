@@ -9,6 +9,13 @@ import {
   MedicationLanguageCode,
 } from '@/types/medication';
 import { ChatMessage } from './openai';
+import { EmotionFlashcard } from '@/types/vocabulary';
+
+import {
+  ConditionExplanation,
+  ConditionLanguageCode,
+} from '@/types/condition';
+
 
 function formatMedications(memory: PatientMemory): string {
   if (memory.medications.length === 0) return 'No medications recorded.';
@@ -154,7 +161,6 @@ export function buildClinicalReportMessages(
     transcript: string;
     emotionTags: string[];
     emotionArc?: string;
-    sessionAvgHR?: number;
   }>,
   healthSnapshots: Array<{
     date: string;
@@ -166,7 +172,7 @@ export function buildClinicalReportMessages(
     steps: number;
   }>
 ): ChatMessage[] {
-  const systemPrompt = `You are a clinical AI assistant generating a structured summary report for a psychiatrist or therapist. The report covers ${patientName}'s last ${sessions.length} check-in sessions combined with Fitbit Charge 6 wearable data.
+  const systemPrompt = `You are a clinical AI assistant generating a structured summary report for a psychiatrist or therapist. The report covers ${patientName}'s last ${sessions.length} check-in sessions combined with Apple Watch wearable data.
 
 Return a JSON object with this exact schema:
 {
@@ -184,7 +190,7 @@ Return a JSON object with this exact schema:
   "wearableTrendNarrative": "2-3 paragraph narrative cross-correlating mood scores with HRV and sleep data, identifying physiological patterns that preceded high-intensity episodes"
 }
 
-Be specific and clinical. Reference actual dates and numbers from the data. Identify patterns, not just summaries. The wearableTrendNarrative should mention specific days where physiology and mood aligned or diverged. Where a session includes an emotionArc (facial expression timeline detected by front camera), include it in your analysis — format it in the wearableTrendNarrative as "Detected emotional arc: [arc string]". Where a session includes sessionAvgHR (live heart rate tracked via Fitbit Charge 6 during check-in), include a sentence like "Live Fitbit heart rate during session averaged X bpm — [brief correlation with topics discussed, e.g. elevated during discussion of work stress, returned toward resting rate after grounding reflection]".`;
+Be specific and clinical. Reference actual dates and numbers from the data. Identify patterns, not just summaries. The wearableTrendNarrative should mention specific days where physiology and mood aligned or diverged. Where a session includes an emotionArc (facial expression timeline detected by front camera), include it in your analysis — format it in the wearableTrendNarrative as "Detected emotional arc: [arc string]".`;
 
   const dataPayload = JSON.stringify({ sessions, healthSnapshots }, null, 2);
 
@@ -220,7 +226,7 @@ export function buildDoctorFollowupMessages(
 
   const systemPrompt = `You are a clinical AI assistant helping a doctor review patient data for ${patientName}.
 
-The following clinical report was just generated from ${patientName}'s recent check-in sessions and Fitbit Charge 6 wearable data:
+The following clinical report was just generated from ${patientName}'s recent check-in sessions and Apple Watch wearable data:
 
 ${reportContext}
 
@@ -280,23 +286,15 @@ Output exactly one JSON object with this schema (no extra keys):
 }
 
 export function buildMedicationCandidateSearchMessages(query: string): ChatMessage[] {
-  const systemPrompt = `You are a medication name assistant specializing in mental health medications.
+  const systemPrompt = `You are a medication name assistant.
 
-Task: Given a user search phrase, identify possible mental health medicines it refers to.
-Return candidate generic names and common brand names for psychiatric medications only.
-
-Focus on:
-- Antidepressants (SSRIs, SNRIs, TCAs, MAOIs, etc.)
-- Antipsychotics (typical and atypical)
-- Mood stabilizers (lithium, lamotrigine, valproate, etc.)
-- Anxiolytics (benzodiazepines, buspirone)
-- Stimulants for ADHD
-- Other psychiatric medications
+Task: Given a user search phrase, identify possible medications it refers to.
+Return candidate generic names and common brand names for any legitimate medication.
 
 Safety:
 - Do not give dosing instructions.
 - Do not give personal medical advice.
-- Only include legitimate mental health medications.
+- Only include real, approved medications.
 
 Output exactly one JSON object with this schema (no extra keys):
 {
@@ -305,7 +303,7 @@ Output exactly one JSON object with this schema (no extra keys):
   ]
 }
 
-Only include realistic medicine candidates. If uncertain, include fewer candidates. If the query doesn't seem related to mental health medications, return empty array.`;
+Only include realistic medicine candidates. If uncertain, include fewer candidates. If the query is not a medication, return an empty candidates array.`;
 
   return [
     { role: 'system', content: systemPrompt },
@@ -400,3 +398,191 @@ The patient needs a brief, reassuring response and a short reminder to consult a
     },
   ];
 }
+
+export function buildConditionExplanationMessages(
+  conditionName: string,
+): ChatMessage[] {
+  return [
+    {
+      role: 'system',
+      content: `You are MindLog, a patient-friendly mental health education assistant.
+
+You explain mental health conditions in simple, clear language that patients and caregivers can understand.
+
+Safety rules:
+- Do NOT provide personal medical advice
+- Do NOT diagnose the user
+- Do NOT recommend treatments or medications
+- Always include a short disclaimer that this is for education only and does not replace professional advice
+
+Output exactly one JSON object with this schema (no extra keys):
+{
+  "conditionId": string,
+  "conditionName": string,
+  "whatItIs": { "title": string, "content": string },
+  "symptoms": { "title": string, "items": string[] },
+  "disclaimer": string
+}
+
+Keep language simple. Write as if explaining to someone with no medical background.`,
+    },
+    {
+      role: 'user',
+      content: `Please explain this mental health condition in simple language: ${conditionName}`,
+    },
+  ];
+}
+
+export function buildConditionTranslationMessages(
+  explanation: ConditionExplanation,
+  targetLanguage: ConditionLanguageCode,
+): ChatMessage[] {
+  const langLabel = conditionLanguageLabel(targetLanguage);
+  return [
+    {
+      role: 'system',
+      content: `You translate mental health condition explanations for patients.
+
+Translate the following explanation into ${langLabel}.
+Keep the structure exactly the same and preserve all safety meaning.
+
+Safety rules:
+- Do NOT add medical advice
+- Do NOT add dosing instructions
+- Do NOT diagnose
+
+Output exactly one JSON object with the same schema as the input (no extra keys).`,
+    },
+    {
+      role: 'user',
+      content: `Condition explanation to translate:\n\n${JSON.stringify(explanation, null, 2)}`,
+    },
+  ];
+}
+
+export function buildConditionFollowupMessages(
+  conditionName: string,
+  explanation: ConditionExplanation,
+  question: string,
+  targetLanguage: ConditionLanguageCode,
+): ChatMessage[] {
+  const langLabel = conditionLanguageLabel(targetLanguage);
+  return [
+    {
+      role: 'system',
+      content: `You are a mental health education assistant inside MindLog.
+
+You ONLY answer questions that help the user better understand what the condition is and what its symptoms mean.
+
+Rules:
+- Answer in ${langLabel}
+- Do NOT diagnose the user
+- Do NOT recommend treatments or medications
+- Do NOT provide personal medical advice
+- If the question asks for a diagnosis or treatment, politely redirect and suggest they speak to a professional
+- Keep answers brief, clear, and compassionate`,
+    },
+    {
+      role: 'user',
+      content: `Condition: ${conditionName}\n\nExplanation shown to user:\n${JSON.stringify(explanation, null, 2)}\n\nUser question:\n${question}`,
+    },
+  ];
+}
+
+function conditionLanguageLabel(code: ConditionLanguageCode): string {
+  switch (code) {
+    case 'bn': return 'Bengali';
+    case 'ar': return 'Arabic';
+    case 'fr': return 'French';
+    case 'en':
+    default: return 'English';
+  }
+}
+
+export function buildConditionExploreMessages(
+  input: string,
+  language: ConditionLanguageCode,
+): ChatMessage[] {
+  const langLabel = conditionLanguageLabel(language);
+  return [
+    {
+      role: 'system',
+      content: `You are a mental health education assistant inside MindLog.
+
+A user has typed something into an explore box. It could be:
+- A general question about a mental health condition (e.g. "what is anxiety?", "how does PTSD affect people?")
+- A list of symptoms they are curious about (e.g. "I feel sad all the time and can't sleep", "racing thoughts, can't focus")
+
+Your job is to detect what they meant and respond accordingly.
+
+Safety rules — strictly follow these:
+- Do NOT diagnose the user
+- Do NOT tell the user they have any condition
+- Do NOT recommend treatments or medications
+- Frame everything as educational information only
+- If the input seems like personal distress rather than curiosity, respond with warmth and suggest they speak to a professional
+
+Detection rules:
+- If the input is a question → set type to "question" and provide a clear, simple educational answer in the "answer" field
+- If the input describes symptoms → set type to "symptoms" and return the top 5 mental health conditions whose symptoms most closely match, each with a short 2-sentence blurb. Do NOT say the user has these conditions — frame it as "this condition often involves symptoms like..."
+
+Output exactly one JSON object (no extra keys):
+{
+  "type": "question" | "symptoms",
+  "answer": string | null,
+  "matchedConditions": [
+    {
+      "conditionId": string,
+      "conditionName": string,
+      "blurb": string
+    }
+  ] | null
+}
+
+Respond entirely in ${langLabel}.
+Keep all language simple, warm, and educational.`,
+    },
+    {
+      role: 'user',
+      content: input,
+    },
+  ];
+}
+export function buildVocabularyFlashcardsMessages(userText: string): ChatMessage[] {
+  return [
+    {
+      role: 'system',
+      content: `You are an emotion vocabulary coach. A user has written how they're feeling, possibly in vague or imprecise language.
+Your job is to generate 5 emotion flashcards — words that more precisely capture what they may be experiencing.
+
+Rules:
+- Choose words that genuinely fit the user's description. Don't invent a mood they didn't express.
+- Prefer specific, nuanced words over generic ones (e.g., "lethargic" over "tired").
+- Include a mix of intensities: some mild, some moderate, one intense if warranted.
+- "whyItFits" should be 1 short sentence explaining why THIS word matches THEIR specific words.
+- "exampleSentence" should use the word naturally in a sentence a real person might say.
+- "relatedWords" should list 3 simpler or related alternatives.
+
+Output exactly one JSON object with this schema (no extra keys):
+{
+  "flashcards": [
+    {
+      "word": string,
+      "simpleDefinition": string,
+      "exampleSentence": string,
+      "relatedWords": string[],
+      "intensity": "mild" | "moderate" | "intense",
+      "whyItFits": string
+    }
+  ]
+}`,
+    },
+    {
+      role: 'user',
+      content: `How the user described their feelings:\n"${userText}"`,
+    },
+  ];
+}
+
+// Unused import guard — EmotionFlashcard is exported for the prompt return type reference.
+export type { EmotionFlashcard };

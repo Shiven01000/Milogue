@@ -15,11 +15,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { H2, Body, Label } from '@/components/common/Typography';
 import { Button } from '@/components/common/Button';
 import { ProgressDots } from '@/components/common/ProgressDots';
+import { VoicePicker } from '@/components/common/VoicePicker';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
 import { useMemoryStore } from '@/store/memoryStore';
 import { RootStackParamList } from '@/navigation/types';
 import { isNonEmpty } from '@/utils/validation';
+import { VoiceGender } from '@/services/tts/elevenlabsTtsService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -88,6 +90,7 @@ export function ProfileSetupScreen() {
   const [emergencyName, setEmergencyName] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [conditions, setConditions] = useState<string[]>([]);
+  const [preferredVoice, setPreferredVoice] = useState<VoiceGender | 'custom' | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   const canContinue = isNonEmpty(name);
@@ -107,6 +110,7 @@ export function ProfileSetupScreen() {
       emergencyContactPhone: emergencyPhone.trim() || undefined,
       conditions,
       patientCode,
+      preferredVoice: (preferredVoice === 'custom' ? 'female' : preferredVoice) ?? 'female',
       setupComplete: true,
     });
     setSaving(false);
@@ -203,6 +207,12 @@ export function ProfileSetupScreen() {
             <ChipGroup options={CONDITIONS} selected={conditions} onToggle={toggleCondition} />
           </View>
 
+          <View style={styles.field}>
+            <Label>Milo's voice</Label>
+            <Text style={styles.voiceHint}>Pick a voice and tap Sample to hear it.</Text>
+            <VoicePicker value={preferredVoice} onChange={setPreferredVoice} />
+          </View>
+
           <Button
             label="Continue"
             onPress={handleContinue}
@@ -233,4 +243,5 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   cta: { marginTop: spacing.base },
+  voiceHint: { fontSize: 12, color: colors.textTertiary, marginBottom: spacing.xs },
 });

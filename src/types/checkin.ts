@@ -38,5 +38,4 @@ export interface CheckinSession {
   sessionSummary: string;
   healthSnapshotId: string;
   emotionTimeline?: EmotionSample[];
-  sessionAvgHR?: number;
 }

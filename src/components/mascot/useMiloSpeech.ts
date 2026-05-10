@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Audio } from 'expo-av';
 import { synthesizeSpeech } from '@/services/tts/openaiTtsService';
+import { synthesizeSpeechElevenLabs, ELEVENLABS_VOICES } from '@/services/tts/elevenlabsTtsService';
+import { useMemoryStore } from '@/store/memoryStore';
 
 function audioOp<T>(promise: Promise<T>): Promise<T> {
   return Promise.race([
@@ -10,6 +12,7 @@ function audioOp<T>(promise: Promise<T>): Promise<T> {
 }
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
+const ELEVENLABS_API_KEY = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY ?? '';
 
 export type MiloState = 'idle' | 'speaking' | 'listening' | 'happy';
 
@@ -51,10 +54,25 @@ function chunkText(text: string): string[] {
 }
 
 export function useMiloSpeech() {
+  const { memory } = useMemoryStore();
   const [miloState, setMiloState]       = useState<MiloState>('idle');
   const [currentSubtitle, setCurrentSubtitle] = useState('');
   const soundRef       = useRef<Audio.Sound | null>(null);
   const subtitleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const synthesizeMiloSpeech = useCallback((text: string): Promise<Audio.Sound> => {
+    if (ELEVENLABS_API_KEY) {
+      let voiceId: string;
+      if (memory.preferredVoice === 'custom' && memory.clonedVoiceId) {
+        voiceId = memory.clonedVoiceId;
+      } else {
+        const gender = memory.preferredVoice === 'custom' ? 'female' : (memory.preferredVoice ?? 'female');
+        voiceId = ELEVENLABS_VOICES[gender];
+      }
+      return synthesizeSpeechElevenLabs(text, ELEVENLABS_API_KEY, voiceId);
+    }
+    return synthesizeSpeech(text, OPENAI_API_KEY);
+  }, [memory.preferredVoice, memory.clonedVoiceId]);
 
   const clearSubtitleTimer = useCallback(() => {
     if (subtitleTimerRef.current) {
@@ -95,7 +113,7 @@ export function useMiloSpeech() {
       console.log('[speak] calling TTS');
       // Kick off TTS — master timeout guards against any internal hang
       const sound = await Promise.race([
-        synthesizeSpeech(text, OPENAI_API_KEY),
+        synthesizeMiloSpeech(text),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('TTS master timeout')), 22000)
         ),
