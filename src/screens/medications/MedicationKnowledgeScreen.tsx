@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { H2, H3, Body, BodySmall, Caption } from '@/components/common/Typography';
 import { Card } from '@/components/common/Card';
@@ -29,6 +31,7 @@ import {
   searchMedicationCandidatesFromOpenFda,
   searchMedicationCandidatesWithAI,
   fetchMedicationEntryWithAI,
+  identifyMedicationFromImage,
 } from '@/services/medications/openFdaService';
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
@@ -154,6 +157,7 @@ export function MedicationKnowledgeScreen() {
   const [language, setLanguage] = useState<MedicationLanguageCode>('en');
   const [translationLoading, setTranslationLoading] = useState(false);
 
+  const [scanning, setScanning] = useState(false);
   const [question, setQuestion] = useState('');
   const [followupLoading, setFollowupLoading] = useState(false);
   const [followups, setFollowups] = useState<Array<{ id: string; question: string; answer: string; askedAt: number }>>([]);
@@ -163,6 +167,51 @@ export function MedicationKnowledgeScreen() {
     if (language === 'en') return baseExplanation;
     return translatedExplanation ?? baseExplanation;
   }, [baseExplanation, translatedExplanation, language]);
+
+  const handleScanCamera = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Camera permission needed', 'Allow camera access in Settings to scan a medication.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.6,
+      base64: true,
+    });
+
+    if (result.canceled || !result.assets[0]?.base64) return;
+
+    if (!OPENAI_API_KEY) {
+      Alert.alert('API key required', 'An OpenAI API key is needed to identify medications from photos.');
+      return;
+    }
+
+    setScanning(true);
+    setSearchError(null);
+    setCandidates([]);
+
+    try {
+      const { base64, mimeType } = result.assets[0];
+      const name = await identifyMedicationFromImage(base64!, mimeType ?? 'image/jpeg', OPENAI_API_KEY);
+      if (!name) {
+        setSearchError('Could not identify a medication in that photo. Try a clearer shot of the label or packaging.');
+        return;
+      }
+      setQuery(name);
+      const next = await searchMedicationCandidatesWithAI(name, OPENAI_API_KEY);
+      if (next.length === 0) {
+        setSearchError(`Identified "${name}" but couldn't find medication details. Try searching manually.`);
+      } else {
+        setCandidates(next);
+      }
+    } catch {
+      setSearchError('Something went wrong scanning the medication. Please try again.');
+    } finally {
+      setScanning(false);
+    }
+  }, []);
 
   const handleSelect = useCallback((candidate: MedicationCandidate) => {
     setSelected(candidate);
@@ -201,7 +250,7 @@ export function MedicationKnowledgeScreen() {
         if (!cancelled) {
           setCandidates(next);
           if (next.length === 0) {
-            setSearchError('No mental health medication matches found. Try different search terms.');
+            setSearchError('No medication matches found. Try a different spelling or brand name.');
           }
         }
       } catch {
@@ -336,20 +385,34 @@ export function MedicationKnowledgeScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <H2 style={styles.title}>Medication Knowledge</H2>
           <Body color={colors.textSecondary} style={styles.subtitle}>
-            Search any medication you want to know about. You can translate the explanation and ask safe follow-up questions.
+            Search any medication. Translate the explanation or ask follow-up questions in your language.
           </Body>
 
           <Card style={styles.searchCard}>
             <Caption>Search any medication you want to know about</Caption>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Type a medicine name or brand (e.g., Zoloft)"
-              placeholderTextColor={colors.textTertiary}
-              style={styles.searchInput}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View style={styles.searchRow}>
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Type a medicine name or brand (e.g., ibuprofen, Zoloft)"
+                placeholderTextColor={colors.textTertiary}
+                style={styles.searchInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={handleScanCamera}
+                style={styles.cameraButton}
+                accessibilityRole="button"
+                accessibilityLabel="Scan medication with camera"
+                disabled={scanning}
+              >
+                {scanning
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Body style={styles.cameraIcon}>📷</Body>
+                }
+              </TouchableOpacity>
+            </View>
           </Card>
 
           {trimmed.length === 0 ? (
@@ -547,8 +610,9 @@ const styles = StyleSheet.create({
   title: { marginBottom: spacing.sm },
   subtitle: { lineHeight: 22, marginBottom: spacing.base },
   searchCard: { gap: spacing.sm },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   searchInput: {
-    marginTop: spacing.xs,
+    flex: 1,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderRadius: 12,
@@ -556,6 +620,17 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     color: colors.textPrimary,
   },
+  cameraButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraIcon: { fontSize: 20 },
   resultCard: { padding: spacing.base },
   separator: { height: spacing.sm },
   emptyCard: { padding: spacing.base },

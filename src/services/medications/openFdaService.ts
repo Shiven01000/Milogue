@@ -1,5 +1,5 @@
 import { MedicationCandidate, MedicationDatabaseEntry } from '@/types/medication';
-import { chatCompletionJSON } from '@/api/openai';
+import { chatCompletionJSON, chatCompletionWithImage } from '@/api/openai';
 import { buildMedicationCandidateSearchMessages, buildMedicationExplanationFromCandidateMessages } from '@/api/prompts';
 
 const OPEN_FDA_BASE = 'https://api.fda.gov/drug/label.json';
@@ -214,6 +214,29 @@ export async function fetchMedicationEntryWithAI(candidate: MedicationCandidate,
         'Are there any interactions with my other medications?',
       ],
     };
+  }
+}
+
+export async function identifyMedicationFromImage(
+  base64Image: string,
+  mimeType: string,
+  openaiApiKey: string,
+): Promise<string | null> {
+  const prompt =
+    'Look at this image. It may show a medicine bottle, pill packet, blister pack, or loose pills. ' +
+    'Identify the medication name. Reply with only the generic drug name (e.g. "sertraline"), or if you can only see a brand name, reply with that. ' +
+    'If you cannot identify any medication, reply with exactly: UNKNOWN';
+
+  try {
+    const result = await chatCompletionWithImage(prompt, base64Image, mimeType, openaiApiKey, {
+      temperature: 0.1,
+      maxTokens: 64,
+    });
+    const name = result.trim().replace(/^["']|["']$/g, '');
+    if (!name || name.toUpperCase() === 'UNKNOWN') return null;
+    return name;
+  } catch {
+    return null;
   }
 }
 

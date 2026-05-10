@@ -13,6 +13,7 @@ import { CheckinConversationScreen } from '@/screens/checkin/CheckinConversation
 import { CheckinSummaryScreen } from '@/screens/checkin/CheckinSummaryScreen';
 import { CheckinStartScreen } from '@/screens/checkin/CheckinStartScreen';
 import { IncomingCallScreen } from '@/screens/incoming-call/IncomingCallScreen';
+import { VocabularyFlashcardScreen } from '@/screens/vocabulary/VocabularyFlashcardScreen';
 import { RootStackParamList } from './types';
 import { useMemoryStore } from '@/store/memoryStore';
 import { loadAppRole, loadDoctorProfile } from '@/services/storage/doctorStorage';
@@ -69,6 +70,7 @@ export function RootNavigator() {
       <Stack.Screen name="CheckinFlow" component={CheckinConversationScreen} options={{ headerShown: false }} />
       <Stack.Screen name="CheckinSummary" component={CheckinSummaryScreen} options={{ title: 'Session Complete', headerBackVisible: false }} />
       <Stack.Screen name="IncomingCall" component={IncomingCallScreen} options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="VocabularyFlashcards" component={VocabularyFlashcardScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, SafeAreaView, View, Text, TouchableOpacity, Image } from 'react-native';
+import { ScrollView, StyleSheet, SafeAreaView, View, Text, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +26,7 @@ const FEATURES = [
   { key: 'mood',  label: 'Mood\nJournal',   top: '#3ECFBE', bot: '#1AAC99', shadow: '#0D7A6E', emoji: '🌿', nav: 'CheckinStart' as const },
   { key: 'sleep', label: 'Sleep\nInsights', top: '#60A5FA', bot: '#3B82F6', shadow: '#1D4ED8', emoji: '🌙', nav: null },
   { key: 'voice', label: 'Voice\nCheck-in', top: '#A78BFA', bot: '#7C3AED', shadow: '#4C1D95', emoji: '🎙️', nav: 'CheckinStart' as const },
+  { key: 'vocab', label: 'Emotion\nVocab',  top: '#F472B6', bot: '#DB2777', shadow: '#831843', emoji: '💬', nav: 'VocabularyFlashcards' as const },
 ];
 
 function FeatureCard({ item, onPress }: { item: typeof FEATURES[0]; onPress: () => void }) {
@@ -66,14 +67,7 @@ export function HomeScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <View style={styles.headerTopRow}>
-            <Image
-              source={require('../../../assets/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Text style={styles.viewBadge}>Patient View</Text>
-          </View>
+          <Text style={styles.viewBadge}>Patient View</Text>
           <Text style={styles.eyebrow}>{getGreeting()}</Text>
           <Text style={styles.heroName}>{name ? `Hey, ${name} 👋` : 'Hey there 👋'}</Text>
           <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
@@ -99,7 +93,18 @@ export function HomeScreen() {
         <Text style={styles.sectionLabel}>Explore</Text>
         <View style={styles.featureGrid}>
           {FEATURES.map(item => (
-            <FeatureCard key={item.key} item={item} onPress={() => item.nav ? navigation.navigate(item.nav) : undefined} />
+            <FeatureCard
+              key={item.key}
+              item={item}
+              onPress={() => {
+                if (!item.nav) return;
+                if (item.nav === 'VocabularyFlashcards') {
+                  navigation.navigate('VocabularyFlashcards');
+                } else {
+                  navigation.navigate(item.nav);
+                }
+              }}
+            />
           ))}
         </View>
 
@@ -133,17 +138,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.base, paddingBottom: 100 },
   header: { marginBottom: spacing.lg },
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  logo: {
-    height: 36,
-    width: 120,
-    alignSelf: 'flex-start',
-  },
   viewBadge: {
     fontSize: 10,
     fontWeight: '800',

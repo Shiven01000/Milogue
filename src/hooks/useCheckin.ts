@@ -105,7 +105,7 @@ export function useCheckin() {
     [store, memory, todaySnapshot, memoryStore]
   );
 
-  const completeSession = useCallback(async (opts?: { sessionAvgHR?: number }) => {
+  const completeSession = useCallback(async () => {
     const { messages, tliccCoverage, moodScoreAtStart, sessionId, emotionTimeline } = store;
     if (!sessionId) return null;
 
@@ -140,7 +140,6 @@ export function useCheckin() {
       sessionSummary,
       healthSnapshotId: todaySnapshot?.id ?? '',
       emotionTimeline: emotionTimeline.length > 0 ? emotionTimeline : undefined,
-      sessionAvgHR: opts?.sessionAvgHR,
     };
 
     await saveSession(session);

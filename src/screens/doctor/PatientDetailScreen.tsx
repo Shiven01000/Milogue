@@ -43,6 +43,17 @@ type Route = RouteProp<RootStackParamList, 'PatientDetail'>;
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 const CHART_HEIGHT = 68;
 
+const COMMON_CONDITIONS = [
+  'Depression',
+  'Anxiety',
+  'Bipolar Disorder',
+  'ADHD',
+  'OCD',
+  'PTSD',
+  'Schizophrenia',
+  'Borderline Personality Disorder',
+];
+
 function moodColor(score: number) {
   if (score <= 4) return colors.moodLow;
   if (score <= 7) return colors.moodMid;
@@ -139,7 +150,7 @@ export function PatientDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { patientName, patientCode } = route.params;
-  const { memory, updateMedications } = useMemoryStore();
+  const { memory, updateMedications, updateConditions } = useMemoryStore();
   const scrollRef = useRef<ScrollView>(null);
 
   const isConnected =
@@ -159,6 +170,12 @@ export function PatientDetailScreen() {
   const [followupLoading, setFollowupLoading] = useState(false);
   const [callLoading, setCallLoading] = useState(false);
   const [callSent, setCallSent] = useState(false);
+  // Conditions state
+  const [conditions, setConditions] = useState<string[]>([]);
+  const [newCondition, setNewCondition] = useState('');
+  const [addingCondition, setAddingCondition] = useState(false);
+  const [conditionError, setConditionError] = useState('');
+  // const { updateConditions, memory, updateMedications } = useMemoryStore();
 
   useEffect(() => {
     if (isConnected) {
@@ -166,7 +183,7 @@ export function PatientDetailScreen() {
       setMedications([...memory.medications]);
       setHealthRange(getHealthRange(daysAgo(6), todayISO()));
     }
-  }, [isConnected, memory.medications]);
+  }, [isConnected, memory.medications, memory.conditions]);
 
   useEffect(() => {
     if (followupThread.length > 0) {
@@ -193,6 +210,28 @@ export function PatientDetailScreen() {
     await updateMedications(updated);
   };
 
+  const handleAddCondition = async () => {
+    const trimmed = newCondition.trim();
+    if (!trimmed) return;
+    if (conditions.includes(trimmed)) {
+      setConditionError('This condition is already on file.');
+      return;
+    }
+    const updated = [...conditions, trimmed];
+    setConditions(updated);
+    await updateConditions(updated);
+    setNewCondition('');
+    setAddingCondition(false);
+    setConditionError('');
+  };
+  
+  const handleDeleteCondition = async (index: number) => {
+    const updated = conditions.filter((_, i) => i !== index);
+    setConditions(updated);
+    await updateConditions(updated);
+  };
+
+
   const handleGenerateReport = useCallback(async () => {
     setGenerating(true);
     setReportError(null);
@@ -217,7 +256,6 @@ export function PatientDetailScreen() {
           .join('\n'),
         emotionTags: sess.emotionTags,
         emotionArc: sess.emotionTimeline ? formatEmotionArc(sess.emotionTimeline) : undefined,
-        sessionAvgHR: sess.sessionAvgHR,
       }));
       const healthPayload = healthData.map(h => ({
         date: h.date,
@@ -406,6 +444,114 @@ export function PatientDetailScreen() {
             )}
           </Card>
 
+          {/* Conditions */}
+          <Card style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <H3 style={styles.sectionTitle}>Conditions</H3>
+              {isConnected && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setAddingCondition(v => !v);
+                    setNewCondition('');
+                    setConditionError('');
+                  }}
+                >
+                  <Text style={styles.addBtn}>
+                    {addingCondition ? 'Cancel' : '+ Add'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {!isConnected ? (
+              <BodySmall color={colors.textTertiary}>
+                Patient must be connected to manage conditions.
+              </BodySmall>
+            ) : (
+              <>
+                {conditions.length === 0 && !addingCondition ? (
+                  <BodySmall color={colors.textTertiary}>
+                    No conditions on file.
+                  </BodySmall>
+                ) : null}
+
+                {conditions.map((condition, i) => (
+                  <View key={i} style={styles.medRow}>
+                    <View style={{ flex: 1 }}>
+                      <Body style={{ fontWeight: '700' }}>{condition}</Body>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteCondition(i)}
+                      style={styles.deleteBtn}
+                    >
+                      <Text style={styles.deleteText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                {addingCondition && (
+                  <View style={styles.addForm}>
+                    {/* Quick select from common conditions */}
+                    <BodySmall
+                      color={colors.textSecondary}
+                      style={{ marginBottom: spacing.xs }}
+                    >
+                      Select or type a condition:
+                    </BodySmall>
+                    <View style={styles.conditionChips}>
+                      {COMMON_CONDITIONS
+                        .filter(c => !conditions.includes(c))
+                        .map(c => (
+                          <TouchableOpacity
+                            key={c}
+                            style={styles.conditionChipOption}
+                            onPress={() => setNewCondition(c)}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.conditionChipOptionText,
+                                newCondition === c &&
+                                  styles.conditionChipOptionTextActive,
+                              ]}
+                            >
+                              {c}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <TextInput
+                      style={styles.input}
+                      value={newCondition}
+                      onChangeText={text => {
+                        setNewCondition(text);
+                        setConditionError('');
+                      }}
+                      placeholder="Or type a custom condition"
+                      placeholderTextColor={colors.textTertiary}
+                    />
+
+                    {conditionError ? (
+                      <Body
+                        color={colors.error}
+                        style={{ fontSize: 13, marginTop: spacing.xs }}
+                      >
+                        {conditionError}
+                      </Body>
+                    ) : null}
+
+                    <Button
+                      label="Add condition"
+                      onPress={handleAddCondition}
+                      disabled={!newCondition.trim()}
+                    />
+                  </View>
+                )}
+              </>
+            )}
+          </Card>    
+
           {/* Check-in History */}
           <Card style={styles.section}>
             <H3 style={styles.sectionTitle}>Recent Check-ins</H3>
@@ -448,13 +594,7 @@ export function PatientDetailScreen() {
           {/* Wearable Trends */}
           {isConnected && healthRange.length > 0 && (
             <Card style={styles.section}>
-              <View style={styles.wearableHeaderRow}>
-                <H3 style={styles.sectionTitle}>Wearable Trends (7-Day)</H3>
-                <View style={styles.fitbitBadge}>
-                  <View style={styles.fitbitDot} />
-                  <Text style={styles.fitbitBadgeText}>Fitbit Charge 6</Text>
-                </View>
-              </View>
+              <H3 style={styles.sectionTitle}>Wearable Trends (7-Day)</H3>
               <WearableBarChart
                 data={healthRange}
                 getValue={s => s.hrv.morningHRV}
@@ -512,12 +652,6 @@ export function PatientDetailScreen() {
                 )}
                 {report && (
                   <View style={styles.reportPreview}>
-                    <View style={styles.wearableSourceRow}>
-                      <View style={styles.fitbitDot} />
-                      <BodySmall color={colors.textTertiary}>
-                        Wearable data source: Fitbit Charge 6 — synced during session
-                      </BodySmall>
-                    </View>
                     <View style={styles.reportStats}>
                       <View style={styles.reportStat}>
                         <H3 color={colors.primary}>{String(report.sessionCount)}</H3>
@@ -678,42 +812,6 @@ const styles = StyleSheet.create({
   content: { padding: spacing.base, paddingBottom: 100, gap: spacing.base },
   section: { gap: spacing.sm },
   sectionTitle: { marginBottom: spacing.xs },
-  wearableHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  fitbitBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(52,199,89,0.1)',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  fitbitDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34C759',
-  },
-  fitbitBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#34C759',
-  },
-  wearableSourceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.sm,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    backgroundColor: 'rgba(52,199,89,0.08)',
-    borderRadius: 10,
-  },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -864,4 +962,28 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { opacity: 0.35 },
   sendBtnText: { fontSize: 18, color: '#fff', fontWeight: '700', marginTop: -2 },
+
+  conditionChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  conditionChipOption: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  conditionChipOptionText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  conditionChipOptionTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
 });

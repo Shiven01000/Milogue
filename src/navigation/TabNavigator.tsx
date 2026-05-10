@@ -7,6 +7,7 @@ import { MedicationKnowledgeScreen } from '@/screens/medications/MedicationKnowl
 import { PatientProfileScreen } from '@/screens/patient/PatientProfileScreen';
 import { TabParamList } from './types';
 import { colors } from '@/constants/colors';
+import { ConditionsScreen } from '@/screens/conditions/ConditionsScreen';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
@@ -65,6 +66,16 @@ export function TabNavigator() {
           tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} />,
         }}
       />
+      <Tab.Screen
+        name="Learn"
+        component={ConditionsScreen}
+        options={{
+          tabBarLabel: 'Learn',
+          tabBarIcon: ({ focused }) => (
+            <TabIcon icon="🧠" focused={focused} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -73,3 +84,8 @@ const styles = StyleSheet.create({
   iconPill: { width: 40, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   iconPillActive: { backgroundColor: colors.primaryFaint },
 });
+
+
+
+
+

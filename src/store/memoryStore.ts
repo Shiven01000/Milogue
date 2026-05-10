@@ -12,6 +12,7 @@ interface MemoryState {
   updateMedications: (medications: MedicationEntry[]) => Promise<void>;
   setLastSession: (sessionId: string, summary: string) => Promise<void>;
   incrementSessionCount: () => Promise<void>;
+  updateConditions: (conditions: string[]) => Promise<void>;
 }
 
 export const useMemoryStore = create<MemoryState>((set, get) => ({
@@ -90,6 +91,11 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   incrementSessionCount: async () => {
     const { memory } = get();
     const updated = { ...memory, totalSessionCount: memory.totalSessionCount + 1 };
+    set({ memory: updated });
+    await savePatientMemory(updated);
+  },
+  updateConditions: async (conditions: string[]) => {
+    const updated = { ...get().memory, conditions };
     set({ memory: updated });
     await savePatientMemory(updated);
   },
