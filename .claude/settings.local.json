@@ -1,0 +1,32 @@
+{
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(xxd)",
+      "Bash(python3 *)",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(npx create-expo-app@latest . --template expo-template-blank-typescript --no-install)",
+      "Bash(npm install *)",
+      "Bash(npm info *)",
+      "Bash(npm run *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(gh auth *)",
+      "Bash(git remote *)",
+      "Bash(git config *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Skill(update-config)",
+      "Bash(perl -pe 'chomp if eof')",
+      "Read(//tmp/**)",
+      "Bash(git branch *)",
+      "Bash(npx expo *)",
+      "Bash(node *)",
+      "Bash(npm uninstall *)",
+      "Bash(pkill -f \"expo start\")",
+      "Bash(pkill -f \"metro\")",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

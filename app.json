@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Milogue",
+    "slug": "mindlog",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F8F7F5"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.mindlog.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "MindLog uses the microphone to record your voice during daily check-ins.",
+        "NSSpeechRecognitionUsageDescription": "MindLog uses speech recognition to transcribe your check-in responses.",
+        "NSCameraUsageDescription": "MindLog uses the front camera to detect emotional cues during check-ins. No video is stored or transmitted."
+      }
+    },
+    "android": {
+      "package": "com.mindlog.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#F8F7F5"
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "MindLog uses the microphone to record your voice during daily check-ins."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "MindLog uses the front camera to detect emotional cues during check-ins. No video is stored or transmitted."
+        }
+      ]
+    ]
+  }
+}
