@@ -53,7 +53,6 @@ export function DoctorSettingsScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.badge}>Doctor View</Text>
           <H2 style={styles.title}>Settings</H2>
         </View>
 

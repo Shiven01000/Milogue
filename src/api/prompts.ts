@@ -59,7 +59,8 @@ export function buildCheckinMessages(
   memory: PatientMemory,
   healthSnapshot: HealthSnapshot | undefined,
   conversationHistory: ChatMessage[],
-  detectedEmotion?: DetectedEmotion | null
+  detectedEmotion?: DetectedEmotion | null,
+  languageName = 'English'
 ): ChatMessage[] {
   const name = memory.patientName || 'there';
   let systemPrompt = `You are Milo, a warm and empathetic mental health companion built into the MindLog app, conducting a daily check-in with ${name}. Your name is Milo — use it naturally when introducing yourself.
@@ -124,7 +125,7 @@ Do not ask about these in order. Do not mention T-LICC. Let them emerge organica
 
 
 ## Language
-Always respond in the same language the patient is speaking. If they switch languages mid-conversation, switch with them.
+The patient's preferred language is ${languageName}. Always respond in ${languageName}. If they write in a different language, still reply in ${languageName} unless they explicitly ask you to switch.
 
 ## Output Format
 Plain conversational text only. No lists, no headers, no markdown. Write exactly what you would say aloud.`;
@@ -138,13 +139,13 @@ Plain conversational text only. No lists, no headers, no markdown. Write exactly
 
 export function buildSessionSummaryMessages(
   transcript: string,
-  patientName: string
+  patientName: string,
+  languageName = 'English'
 ): ChatMessage[] {
   return [
     {
       role: 'system',
-      content:
-        'You are a clinical note-taker. Summarize the following therapy check-in session in exactly 2 sentences. Be specific about what the patient shared. Do not use the patient name. Use past tense.',
+      content: `You are a clinical note-taker. Summarize the following therapy check-in session in exactly 2 sentences. Be specific about what the patient shared. Do not use the patient name. Use past tense. Write the summary in ${languageName}.`,
     },
     {
       role: 'user',
@@ -249,11 +250,11 @@ function languageLabel(code: MedicationLanguageCode): string {
   }
 }
 
-export function buildMedicationExplanationMessages(entry: MedicationDatabaseEntry): ChatMessage[] {
+export function buildMedicationExplanationMessages(entry: MedicationDatabaseEntry, languageName = 'English'): ChatMessage[] {
   const systemPrompt = `You are MindLog, a patient-friendly medication knowledge assistant.
 
 You will receive verified medication information (generic name, brand names, what it does, why it is prescribed, and side effects).
-Rewrite it in simple, clear language that a patient can understand.
+Rewrite it in simple, clear language that a patient can understand. Write the entire response in ${languageName}.
 
 Safety rules (must follow):
 - Do NOT provide personal medical advice.
@@ -314,11 +315,11 @@ Only include realistic medicine candidates. If uncertain, include fewer candidat
   ];
 }
 
-export function buildMedicationExplanationFromCandidateMessages(candidate: MedicationCandidate): ChatMessage[] {
+export function buildMedicationExplanationFromCandidateMessages(candidate: MedicationCandidate, languageName = 'English'): ChatMessage[] {
   const systemPrompt = `You are MindLog, a patient-friendly medication knowledge assistant.
 
 You will receive a medication generic name and optional common brand names.
-Rewrite it in simple, clear language that a patient can understand.
+Rewrite it in simple, clear language that a patient can understand. Write the entire response in ${languageName}.
 
 Safety rules (must follow):
 - Do NOT provide personal medical advice.
@@ -377,7 +378,7 @@ export function buildMedicationFollowupMessages(
   candidate: MedicationCandidate,
   explanation: MedicationExplanation,
   question: string,
-  targetLanguage: MedicationLanguageCode,
+  languageName = 'English',
 ): ChatMessage[] {
   return [
     {
@@ -385,7 +386,7 @@ export function buildMedicationFollowupMessages(
       content: `You are a medication knowledge assistant. You answer ONLY about understanding the medicine and its side effects.
 
 Rules:
-- Answer in ${languageLabel(targetLanguage)}.
+- Answer in ${languageName}.
 - Do NOT provide personal medical advice or dosing instructions.
 - If the question sounds like a request to stop, start, increase, or change the dose, you must refuse and say the user should contact their doctor or pharmacist.
 - If the question is about what side effects mean or why people take a medicine, answer in simple language.
@@ -399,7 +400,7 @@ The patient needs a brief, reassuring response and a short reminder to consult a
   ];
 }
 
-export function buildVocabularyFlashcardsMessages(userText: string): ChatMessage[] {
+export function buildVocabularyFlashcardsMessages(userText: string, languageName = 'English'): ChatMessage[] {
   return [
     {
       role: 'system',
@@ -413,6 +414,7 @@ Rules:
 - "whyItFits" should be 1 short sentence explaining why THIS word matches THEIR specific words.
 - "exampleSentence" should use the word naturally in a sentence a real person might say.
 - "relatedWords" should list 3 simpler or related alternatives.
+- Write ALL text fields (word, simpleDefinition, exampleSentence, relatedWords, whyItFits) in ${languageName}.
 
 Output exactly one JSON object with this schema (no extra keys):
 {
@@ -440,13 +442,14 @@ export type { EmotionFlashcard };
 
 export function buildConditionExplanationMessages(
   conditionName: string,
+  languageName = 'English',
 ): ChatMessage[] {
   return [
     {
       role: 'system',
       content: `You are MindLog, a patient-friendly mental health education assistant.
 
-You explain mental health conditions in simple, clear language that patients and caregivers can understand.
+You explain mental health conditions in simple, clear language that patients and caregivers can understand. Write the entire response in ${languageName}.
 
 Safety rules:
 - Do NOT provide personal medical advice
@@ -472,40 +475,13 @@ Keep language simple. Write as if explaining to someone with no medical backgrou
   ];
 }
 
-export function buildConditionTranslationMessages(
-  explanation: ConditionExplanation,
-  targetLanguage: ConditionLanguageCode,
-): ChatMessage[] {
-  const langLabel = conditionLanguageLabel(targetLanguage);
-  return [
-    {
-      role: 'system',
-      content: `You translate mental health condition explanations for patients.
-
-Translate the following explanation into ${langLabel}.
-Keep the structure exactly the same and preserve all safety meaning.
-
-Safety rules:
-- Do NOT add medical advice
-- Do NOT add dosing instructions
-- Do NOT diagnose
-
-Output exactly one JSON object with the same schema as the input (no extra keys).`,
-    },
-    {
-      role: 'user',
-      content: `Condition explanation to translate:\n\n${JSON.stringify(explanation, null, 2)}`,
-    },
-  ];
-}
 
 export function buildConditionFollowupMessages(
   conditionName: string,
   explanation: ConditionExplanation,
   question: string,
-  targetLanguage: ConditionLanguageCode,
+  languageName = 'English',
 ): ChatMessage[] {
-  const langLabel = conditionLanguageLabel(targetLanguage);
   return [
     {
       role: 'system',
@@ -514,7 +490,7 @@ export function buildConditionFollowupMessages(
 You ONLY answer questions that help the user better understand what the condition is and what its symptoms mean.
 
 Rules:
-- Answer in ${langLabel}
+- Answer in ${languageName}
 - Do NOT diagnose the user
 - Do NOT recommend treatments or medications
 - Do NOT provide personal medical advice
@@ -528,22 +504,12 @@ Rules:
   ];
 }
 
-function conditionLanguageLabel(code: ConditionLanguageCode): string {
-  switch (code) {
-    case 'bn': return 'Bengali';
-    case 'ar': return 'Arabic';
-    case 'fr': return 'French';
-    case 'en':
-    default: return 'English';
-  }
-}
 
 export function buildConditionExploreMessages(
   input: string,
-  language: ConditionLanguageCode,
+  languageName: string,
   patientConditions: string,
 ): ChatMessage[] {
-  const langLabel = conditionLanguageLabel(language);
   return [
     {
       role: 'system',
@@ -581,7 +547,7 @@ Output exactly one JSON object (no extra keys):
   ] | null
 }
 
-Respond entirely in ${langLabel}.
+Respond entirely in ${languageName}.
 Keep all language simple, warm, and educational.`,
     },
     {

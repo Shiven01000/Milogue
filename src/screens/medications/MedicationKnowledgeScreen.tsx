@@ -35,18 +35,17 @@ import {
   fetchMedicationEntryWithAI,
   identifyMedicationFromImage,
 } from '@/services/medications/openFdaService';
+import { useMemoryStore } from '@/store/memoryStore';
+import { getLanguageName } from '@/constants/languages';
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 
-const LANGUAGE_OPTIONS: Array<{ code: MedicationLanguageCode; label: string }> = [
-  { code: 'en', label: 'English' },
-  { code: 'bn', label: 'Bengali' },
-  { code: 'ar', label: 'Arabic' },
-  { code: 'fr', label: 'French' },
-];
+const LANGUAGE_LABELS: Record<MedicationLanguageCode, string> = {
+  en: 'English', bn: 'Bengali', ar: 'Arabic', fr: 'French',
+};
 
 function labelForLanguage(code: MedicationLanguageCode): string {
-  return LANGUAGE_OPTIONS.find(o => o.code === code)?.label ?? 'English';
+  return LANGUAGE_LABELS[code] ?? 'English';
 }
 
 function buildFallbackExplanation(candidate: MedicationCandidate): MedicationExplanation {
@@ -97,53 +96,6 @@ function MedicationTitle({ entry }: { entry: MedicationCandidate }) {
   );
 }
 
-function LanguageDropdown({
-  value,
-  onChange,
-}: {
-  value: MedicationLanguageCode;
-  onChange: (next: MedicationLanguageCode) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <View style={styles.langWrap}>
-      <TouchableOpacity
-        onPress={() => setOpen(o => !o)}
-        style={styles.langButton}
-        accessibilityRole="button"
-        accessibilityLabel="Select language"
-      >
-        <Body style={styles.langButtonText}>{labelForLanguage(value)}</Body>
-        <Caption color={colors.textTertiary} style={styles.langCaret}>
-          {open ? '▲' : '▼'}
-        </Caption>
-      </TouchableOpacity>
-
-      {open && (
-        <Card style={styles.langMenu} padded={false}>
-          {LANGUAGE_OPTIONS.map(opt => (
-            <TouchableOpacity
-              key={opt.code}
-              onPress={() => {
-                onChange(opt.code);
-                setOpen(false);
-              }}
-              style={styles.langMenuItem}
-              accessibilityRole="button"
-              accessibilityLabel={`Language: ${opt.label}`}
-            >
-              <Body style={{ color: opt.code === value ? colors.primary : colors.textPrimary }}>
-                {opt.label}
-              </Body>
-            </TouchableOpacity>
-          ))}
-        </Card>
-      )}
-    </View>
-  );
-}
-
 function buildTtsScript(explanation: MedicationExplanation): string {
   const parts = [
     explanation.medicationName + '.',
@@ -160,6 +112,9 @@ function buildTtsScript(explanation: MedicationExplanation): string {
 }
 
 export function MedicationKnowledgeScreen() {
+  const { memory } = useMemoryStore();
+  const languageName = getLanguageName(memory.preferredLanguage ?? 'en');
+
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<MedicationCandidate | null>(null);
 
@@ -167,12 +122,8 @@ export function MedicationKnowledgeScreen() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const [baseExplanation, setBaseExplanation] = useState<MedicationExplanation | null>(null);
-  const [translatedExplanation, setTranslatedExplanation] = useState<MedicationExplanation | null>(null);
+  const [explanation, setExplanation] = useState<MedicationExplanation | null>(null);
   const [explanationLoading, setExplanationLoading] = useState(false);
-
-  const [language, setLanguage] = useState<MedicationLanguageCode>('en');
-  const [translationLoading, setTranslationLoading] = useState(false);
 
   const [scanning, setScanning] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -181,11 +132,6 @@ export function MedicationKnowledgeScreen() {
   const [followupLoading, setFollowupLoading] = useState(false);
   const [followups, setFollowups] = useState<Array<{ id: string; question: string; answer: string; askedAt: number }>>([]);
 
-  const displayedExplanation = useMemo(() => {
-    if (!baseExplanation) return null;
-    if (language === 'en') return baseExplanation;
-    return translatedExplanation ?? baseExplanation;
-  }, [baseExplanation, translatedExplanation, language]);
 
   const handleScanCamera = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -234,15 +180,13 @@ export function MedicationKnowledgeScreen() {
 
   const handleSelect = useCallback((candidate: MedicationCandidate) => {
     setSelected(candidate);
-    setBaseExplanation(null);
-    setTranslatedExplanation(null);
+    setExplanation(null);
     setExplanationLoading(false);
     const s = soundRef.current;
     if (s) { soundRef.current = null; s.stopAsync().catch(() => {}); s.unloadAsync().catch(() => {}); }
     setIsSpeaking(false);
     setQuestion('');
     setFollowups([]);
-    setLanguage('en');
   }, []);
 
   // Search for mental health medications using AI.
@@ -300,17 +244,16 @@ export function MedicationKnowledgeScreen() {
       setExplanationLoading(true);
       try {
         if (!OPENAI_API_KEY) {
-          if (!cancelled) setBaseExplanation(buildFallbackExplanation(selected));
+          if (!cancelled) setExplanation(buildFallbackExplanation(selected));
           return;
         }
 
-        // Use AI to generate explanation directly from candidate
-        const messages = buildMedicationExplanationFromCandidateMessages(selected);
+        const messages = buildMedicationExplanationFromCandidateMessages(selected, languageName);
         const raw = await chatCompletionJSON(messages, OPENAI_API_KEY, { maxTokens: 1024, temperature: 0.2 });
         const parsed = JSON.parse(raw) as MedicationExplanation;
-        if (!cancelled) setBaseExplanation(parsed);
+        if (!cancelled) setExplanation(parsed);
       } catch {
-        if (!cancelled) setBaseExplanation(buildFallbackExplanation(selected));
+        if (!cancelled) setExplanation(buildFallbackExplanation(selected));
       } finally {
         if (!cancelled) setExplanationLoading(false);
       }
@@ -323,34 +266,8 @@ export function MedicationKnowledgeScreen() {
     };
   }, [selected]);
 
-  const handleTranslate = useCallback(async () => {
-    if (!baseExplanation) return;
-    if (language === 'en') {
-      setTranslatedExplanation(null);
-      return;
-    }
-
-    setTranslationLoading(true);
-    try {
-      if (!OPENAI_API_KEY) {
-        // Without an API key we cannot translate; keep showing English until translation succeeds.
-        setTranslatedExplanation(null);
-        return;
-      }
-
-      const messages = buildMedicationTranslationMessages(baseExplanation, language);
-      const raw = await chatCompletionJSON(messages, OPENAI_API_KEY, { maxTokens: 1024, temperature: 0.3 });
-      const parsed = JSON.parse(raw) as MedicationExplanation;
-      setTranslatedExplanation(parsed);
-    } catch {
-      setTranslatedExplanation(null);
-    } finally {
-      setTranslationLoading(false);
-    }
-  }, [baseExplanation, language]);
-
   const handleAsk = useCallback(async () => {
-    if (!selected || !baseExplanation) return;
+    if (!selected || !explanation) return;
     const q = question.trim();
     if (!q) return;
 
@@ -381,7 +298,7 @@ export function MedicationKnowledgeScreen() {
         return;
       }
 
-      const messages = buildMedicationFollowupMessages(selected, baseExplanation, q, language);
+      const messages = buildMedicationFollowupMessages(selected, explanation, q, languageName);
       const answer = await chatCompletion(messages, OPENAI_API_KEY, { temperature: 0.4, maxTokens: 256 });
       setFollowups(prev => [...prev, { id: `fu_${now}`, question: q, answer, askedAt: now }]);
     } catch {
@@ -397,7 +314,7 @@ export function MedicationKnowledgeScreen() {
     } finally {
       setFollowupLoading(false);
     }
-  }, [selected, baseExplanation, question, language]);
+  }, [selected, explanation, question, languageName]);
 
   const handleToggleSpeech = useCallback(async () => {
     if (isSpeaking) {
@@ -406,10 +323,10 @@ export function MedicationKnowledgeScreen() {
       setIsSpeaking(false);
       return;
     }
-    if (!displayedExplanation || !OPENAI_API_KEY) return;
+    if (!explanation || !OPENAI_API_KEY) return;
     setIsSpeaking(true);
     try {
-      const sound = await synthesizeSpeech(buildTtsScript(displayedExplanation), OPENAI_API_KEY, 'nova');
+      const sound = await synthesizeSpeech(buildTtsScript(explanation), OPENAI_API_KEY, 'nova');
       soundRef.current = sound;
       sound.setOnPlaybackStatusUpdate(status => {
         if (status.isLoaded && status.didJustFinish) {
@@ -422,7 +339,7 @@ export function MedicationKnowledgeScreen() {
     } catch {
       setIsSpeaking(false);
     }
-  }, [isSpeaking, displayedExplanation]);
+  }, [isSpeaking, explanation]);
 
   if (!selected) {
     const trimmed = query.trim();
@@ -508,8 +425,6 @@ export function MedicationKnowledgeScreen() {
     );
   }
 
-  const showEnglishHint = language !== 'en' && !translatedExplanation;
-
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -526,29 +441,13 @@ export function MedicationKnowledgeScreen() {
 
           <MedicationTitle entry={selected} />
 
-          <Card style={styles.translateCard}>
-            <View style={styles.translateRow}>
-              <LanguageDropdown value={language} onChange={setLanguage} />
-              <View style={{ flex: 1 }} />
+          {languageName !== 'English' && (
+            <View style={styles.langPill}>
+              <Caption style={styles.langPillText}>🌐  {languageName}</Caption>
             </View>
-            {showEnglishHint ? (
-              <BodySmall color={colors.textSecondary} style={styles.translateHint}>
-                Showing English. Tap `Translate` after generating the explanation.
-              </BodySmall>
-            ) : null}
-            {language !== 'en' && (
-              <Button
-                label={translationLoading ? 'Translating...' : 'Translate'}
-                onPress={handleTranslate}
-                disabled={!baseExplanation || translationLoading}
-                loading={translationLoading}
-                variant="secondary"
-                style={styles.translateBtn}
-              />
-            )}
-          </Card>
+          )}
 
-          {displayedExplanation && !explanationLoading && (
+          {explanation && !explanationLoading && (
             <TouchableOpacity
               onPress={handleToggleSpeech}
               style={[styles.listenBtn, isSpeaking && styles.listenBtnActive]}
@@ -561,7 +460,7 @@ export function MedicationKnowledgeScreen() {
             </TouchableOpacity>
           )}
 
-          {explanationLoading || !displayedExplanation ? (
+          {explanationLoading || !explanation ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator color={colors.primary} />
               <Caption color={colors.textSecondary}>Preparing your explanation...</Caption>
@@ -569,18 +468,18 @@ export function MedicationKnowledgeScreen() {
           ) : (
             <>
               <View style={styles.section}>
-                <H3>{displayedExplanation.whatItDoes.title}</H3>
-                <Body color={colors.textSecondary}>{displayedExplanation.whatItDoes.content}</Body>
+                <H3>{explanation.whatItDoes.title}</H3>
+                <Body color={colors.textSecondary}>{explanation.whatItDoes.content}</Body>
               </View>
 
               <View style={styles.section}>
-                <H3>{displayedExplanation.whyDoctorsPrescribe.title}</H3>
-                <Body color={colors.textSecondary}>{displayedExplanation.whyDoctorsPrescribe.content}</Body>
+                <H3>{explanation.whyDoctorsPrescribe.title}</H3>
+                <Body color={colors.textSecondary}>{explanation.whyDoctorsPrescribe.content}</Body>
               </View>
 
               <View style={styles.section}>
-                <H3>{displayedExplanation.commonSideEffects.title}</H3>
-                {displayedExplanation.commonSideEffects.items.map((s, idx) => (
+                <H3>{explanation.commonSideEffects.title}</H3>
+                {explanation.commonSideEffects.items.map((s, idx) => (
                   <BodySmall key={idx} color={colors.textSecondary} style={styles.bulletRow}>
                     • {s}
                   </BodySmall>
@@ -588,25 +487,25 @@ export function MedicationKnowledgeScreen() {
               </View>
 
               <View style={styles.section}>
-                <H3>{displayedExplanation.seriousSideEffects.title}</H3>
-                {displayedExplanation.seriousSideEffects.items.map((s, idx) => (
+                <H3>{explanation.seriousSideEffects.title}</H3>
+                {explanation.seriousSideEffects.items.map((s, idx) => (
                   <BodySmall key={idx} color={colors.textSecondary} style={styles.bulletRow}>
                     • {s}
                   </BodySmall>
                 ))}
-                {displayedExplanation.seriousSideEffects.contactDoctorText ? (
+                {explanation.seriousSideEffects.contactDoctorText ? (
                   <BodySmall
                     color={colors.textSecondary}
                     style={{ ...styles.bulletRow, ...styles.contactDoctorText }}
                   >
-                    {displayedExplanation.seriousSideEffects.contactDoctorText}
+                    {explanation.seriousSideEffects.contactDoctorText}
                   </BodySmall>
                 ) : null}
               </View>
 
               <View style={styles.section}>
-                <H3>{displayedExplanation.questionsToAskPharmacistOrDoctor.title}</H3>
-                {displayedExplanation.questionsToAskPharmacistOrDoctor.items.map((s, idx) => (
+                <H3>{explanation.questionsToAskPharmacistOrDoctor.title}</H3>
+                {explanation.questionsToAskPharmacistOrDoctor.items.map((s, idx) => (
                   <BodySmall key={idx} color={colors.textSecondary} style={styles.bulletRow}>
                     • {s}
                   </BodySmall>
@@ -656,7 +555,7 @@ export function MedicationKnowledgeScreen() {
 
           <Card style={styles.disclaimerCard}>
             <H3 style={styles.disclaimerTitle}>Safety disclaimer</H3>
-            <Body color={colors.textSecondary}>{displayedExplanation?.safetyDisclaimer ?? ''}</Body>
+            <Body color={colors.textSecondary}>{explanation?.safetyDisclaimer ?? ''}</Body>
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -722,23 +621,14 @@ const styles = StyleSheet.create({
   translateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   translateBtn: { marginTop: spacing.sm },
   translateHint: { lineHeight: 18, marginTop: spacing.xs },
-
-  langWrap: { position: 'relative', flex: 1 },
-  langButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+  langPill: {
+    backgroundColor: colors.primaryFaint,
     borderRadius: 12,
-    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
   },
-  langButtonText: { flex: 1, paddingRight: spacing.sm },
-  langCaret: { width: 20, textAlign: 'right' },
-  langMenu: { paddingVertical: spacing.xs, marginTop: spacing.xs, overflow: 'hidden' },
-  langMenuItem: { paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, flexDirection: 'row' },
+  langPillText: { color: colors.primary, fontWeight: '700' },
 
   listenBtn: {
     flexDirection: 'row',

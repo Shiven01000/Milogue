@@ -151,7 +151,15 @@ export function PatientProfileScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.badge}>Patient View</Text>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Text style={styles.backArrow}>‹</Text>
+            <Text style={styles.backLabel}>Back</Text>
+          </TouchableOpacity>
           <H2 style={styles.title}>My Profile</H2>
         </View>
 
@@ -372,6 +380,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.base, paddingBottom: 100, gap: spacing.base },
   header: { gap: 4 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: spacing.xs, alignSelf: 'flex-start' },
+  backArrow: { fontSize: 24, color: colors.primary, lineHeight: 26, fontWeight: '600' },
+  backLabel: { fontSize: 15, color: colors.primary, fontWeight: '600' },
   badge: {
     fontSize: 10,
     fontWeight: '800',

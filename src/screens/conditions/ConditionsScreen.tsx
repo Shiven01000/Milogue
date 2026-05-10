@@ -35,87 +35,12 @@ import {
   buildConditionExploreMessages,
   buildConditionExplanationMessages,
   buildConditionFollowupMessages,
-  buildConditionTranslationMessages,
 } from '@/api/prompts';
 import { useMemoryStore } from '@/store/memoryStore';
+import { getLanguageName } from '@/constants/languages';
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 
-// ─── Data ─────────────────────────────────────────────────────
-
-const LANGUAGE_OPTIONS: Array<{
-  code: ConditionLanguageCode;
-  label: string;
-}> = [
-  { code: 'en', label: 'English' },
-  { code: 'bn', label: 'Bengali' },
-  { code: 'ar', label: 'Arabic' },
-  { code: 'fr', label: 'French' },
-];
-
-function languageLabel(code: ConditionLanguageCode): string {
-  return (
-    LANGUAGE_OPTIONS.find(o => o.code === code)?.label ?? 'English'
-  );
-}
-
-// ─── Language Dropdown ────────────────────────────────────────
-
-function LanguageDropdown({
-  value,
-  onChange,
-}: {
-  value: ConditionLanguageCode;
-  onChange: (next: ConditionLanguageCode) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <View style={styles.langWrap}>
-      <TouchableOpacity
-        onPress={() => setOpen(o => !o)}
-        style={styles.langButton}
-        accessibilityRole="button"
-        accessibilityLabel="Select language"
-      >
-        <Body style={styles.langButtonText}>
-          {languageLabel(value)}
-        </Body>
-        <Caption
-          color={colors.textTertiary}
-          style={styles.langCaret}
-        >
-          {open ? '▲' : '▼'}
-        </Caption>
-      </TouchableOpacity>
-      {open && (
-        <Card style={styles.langMenu} padded={false}>
-          {LANGUAGE_OPTIONS.map(opt => (
-            <TouchableOpacity
-              key={opt.code}
-              onPress={() => {
-                onChange(opt.code);
-                setOpen(false);
-              }}
-              style={styles.langMenuItem}
-              accessibilityRole="button"
-            >
-              <Body
-                style={{
-                  color:
-                    opt.code === value
-                      ? colors.primary
-                      : colors.textPrimary,
-                }}
-              >
-                {opt.label}
-              </Body>
-            </TouchableOpacity>
-          ))}
-        </Card>
-      )}
-    </View>
-  );
-}
 
 // ─── Explore Section ──────────────────────────────────────────
 
@@ -124,7 +49,7 @@ function ExploreSection({
   conditions,
   onNavigateToCondition,
 }: {
-  language: ConditionLanguageCode;
+  language: string;
   conditions: ConditionId[];
   onNavigateToCondition: (id: ConditionId) => void;
 }) {
@@ -322,42 +247,33 @@ function ConditionCard({
 
 function ConditionDetailView({
   condition,
+  languageName,
   onBack,
 }: {
   condition: ConditionId;
+  languageName: string;
   onBack: () => void;
 }) {
-  const [language, setLanguage] =
-    useState<ConditionLanguageCode>('en');
-  const [baseExplanation, setBaseExplanation] =
-    useState<ConditionExplanation | null>(null);
-  const [translatedExplanation, setTranslatedExplanation] =
+  const [explanation, setExplanation] =
     useState<ConditionExplanation | null>(null);
   const [explanationLoading, setExplanationLoading] = useState(true);
-  const [translationLoading, setTranslationLoading] = useState(false);
   const [question, setQuestion] = useState('');
   const [followups, setFollowups] = useState<ConditionFollowupQA[]>(
     [],
   );
   const [followupLoading, setFollowupLoading] = useState(false);
 
-  const displayedExplanation = useMemo(() => {
-    if (!baseExplanation) return null;
-    if (language === 'en') return baseExplanation;
-    return translatedExplanation ?? baseExplanation;
-  }, [baseExplanation, translatedExplanation, language]);
-
   useEffect(() => {
     let cancelled = false;
     setExplanationLoading(true);
-    setBaseExplanation(null);
-    setTranslatedExplanation(null);
+    setExplanation(null);
     setFollowups([]);
 
     const generate = async () => {
       try {
         const messages = buildConditionExplanationMessages(
           condition.name,
+          languageName,
         );
         const raw = await chatCompletionJSON(
           messages,
@@ -365,10 +281,10 @@ function ConditionDetailView({
           { maxTokens: 1024, temperature: 0.2 },
         );
         const parsed = JSON.parse(raw) as ConditionExplanation;
-        if (!cancelled) setBaseExplanation(parsed);
+        if (!cancelled) setExplanation(parsed);
       } catch {
         if (!cancelled) {
-          setBaseExplanation({
+          setExplanation({
             conditionId: condition.id,
             conditionName: condition.name,
             whatItIs: {
@@ -390,36 +306,10 @@ function ConditionDetailView({
     return () => {
       cancelled = true;
     };
-  }, [condition]);
-
-  const handleTranslate = useCallback(async () => {
-    if (!baseExplanation) return;
-    if (language === 'en') {
-      setTranslatedExplanation(null);
-      return;
-    }
-    setTranslationLoading(true);
-    try {
-      const messages = buildConditionTranslationMessages(
-        baseExplanation,
-        language,
-      );
-      const raw = await chatCompletionJSON(
-        messages,
-        OPENAI_API_KEY,
-        { maxTokens: 1024, temperature: 0.3 },
-      );
-      const parsed = JSON.parse(raw) as ConditionExplanation;
-      setTranslatedExplanation(parsed);
-    } catch {
-      setTranslatedExplanation(null);
-    } finally {
-      setTranslationLoading(false);
-    }
-  }, [baseExplanation, language]);
+  }, [condition, languageName]);
 
   const handleAsk = useCallback(async () => {
-    if (!baseExplanation) return;
+    if (!explanation) return;
     const q = question.trim();
     if (!q) return;
     setQuestion('');
@@ -429,9 +319,9 @@ function ConditionDetailView({
     try {
       const messages = buildConditionFollowupMessages(
         condition.name,
-        baseExplanation,
+        explanation,
         q,
-        language,
+        languageName,
       );
       const answer = await chatCompletion(
         messages,
@@ -456,7 +346,7 @@ function ConditionDetailView({
     } finally {
       setFollowupLoading(false);
     }
-  }, [baseExplanation, question, language, condition]);
+  }, [explanation, question, languageName, condition]);
 
   return (
     <KeyboardAvoidingView
@@ -480,29 +370,13 @@ function ConditionDetailView({
           <H2>{condition.name}</H2>
         </View>
 
-        <Card style={styles.translateCard}>
-          <View style={styles.translateRow}>
-            <LanguageDropdown
-              value={language}
-              onChange={setLanguage}
-            />
-            <View style={{ flex: 1 }} />
+        {languageName !== 'English' && (
+          <View style={styles.langPill}>
+            <Caption style={styles.langPillText}>🌐  {languageName}</Caption>
           </View>
-          {language !== 'en' && (
-            <Button
-              label={
-                translationLoading ? 'Translating...' : 'Translate'
-              }
-              onPress={handleTranslate}
-              disabled={!baseExplanation || translationLoading}
-              loading={translationLoading}
-              variant="secondary"
-              style={styles.translateBtn}
-            />
-          )}
-        </Card>
+        )}
 
-        {explanationLoading || !displayedExplanation ? (
+        {explanationLoading || !explanation ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={colors.primary} />
             <Caption color={colors.textSecondary}>
@@ -512,15 +386,15 @@ function ConditionDetailView({
         ) : (
           <>
             <View style={styles.section}>
-              <H3>{displayedExplanation.whatItIs.title}</H3>
+              <H3>{explanation.whatItIs.title}</H3>
               <Body color={colors.textSecondary}>
-                {displayedExplanation.whatItIs.content}
+                {explanation.whatItIs.content}
               </Body>
             </View>
 
             <View style={styles.section}>
-              <H3>{displayedExplanation.symptoms.title}</H3>
-              {displayedExplanation.symptoms.items.map(
+              <H3>{explanation.symptoms.title}</H3>
+              {explanation.symptoms.items.map(
                 (s, idx) => (
                   <BodySmall
                     key={idx}
@@ -593,7 +467,7 @@ function ConditionDetailView({
                 Important note
               </H3>
               <Body color={colors.textSecondary}>
-                {displayedExplanation.disclaimer}
+                {explanation.disclaimer}
               </Body>
             </Card>
           </>
@@ -608,7 +482,8 @@ function ConditionDetailView({
 export function ConditionsScreen() {
   const { memory, isLoaded } = useMemoryStore();
   const [selected, setSelected] = useState<ConditionId | null>(null);
-  const [language, setLanguage] = useState<ConditionLanguageCode>('en');
+  const language = memory.preferredLanguage ?? 'en';
+  const languageName = getLanguageName(language);
 
   const patientConditions: ConditionId[] = memory.conditions.map(name => ({
     id: name.toLowerCase().replace(/\s+/g, '_'),
@@ -620,6 +495,7 @@ export function ConditionsScreen() {
       <SafeAreaView style={styles.safe}>
         <ConditionDetailView
           condition={selected}
+          languageName={languageName}
           onBack={() => setSelected(null)}
         />
       </SafeAreaView>
@@ -657,10 +533,8 @@ export function ConditionsScreen() {
           Learn about your diagnosed conditions in simple language.
         </Body>
 
-        <LanguageDropdown value={language} onChange={setLanguage} />
-
         <ExploreSection
-          language={language}
+          language={languageName}
           conditions={patientConditions}
           onNavigateToCondition={setSelected}
         />
@@ -777,31 +651,15 @@ const styles = StyleSheet.create({
   },
   conditionInfo: { flex: 1, gap: 2 },
 
-  // Language
-  langWrap: { position: 'relative' },
-  langButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+  // Language pill (in detail view)
+  langPill: {
+    backgroundColor: colors.primaryFaint,
     borderRadius: 12,
-    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
   },
-  langButtonText: { flex: 1, paddingRight: spacing.sm },
-  langCaret: { width: 20, textAlign: 'right' },
-  langMenu: {
-    paddingVertical: spacing.xs,
-    marginTop: spacing.xs,
-    overflow: 'hidden',
-  },
-  langMenuItem: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    flexDirection: 'row',
-  },
+  langPillText: { color: colors.primary, fontWeight: '700' },
 
   // Detail view
   backRow: { marginBottom: spacing.base },

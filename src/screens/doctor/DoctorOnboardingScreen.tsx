@@ -8,6 +8,7 @@ import {
   Platform,
   Text,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -107,9 +108,11 @@ export function DoctorOnboardingScreen() {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <Text style={styles.badge}>Doctor View</Text>
-          </View>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
 
           <H2 style={styles.heading}>Doctor Setup</H2>
           <Body color={colors.textSecondary} style={styles.sub}>
@@ -177,6 +180,7 @@ export function DoctorOnboardingScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { padding: spacing.base, paddingBottom: spacing.xxl, gap: spacing.base },
+  logo: { width: 72, height: 72, marginLeft: -spacing.base, alignSelf: 'flex-start', opacity: 0.9 },
   header: { alignItems: 'flex-start' },
   badge: {
     fontSize: 10,

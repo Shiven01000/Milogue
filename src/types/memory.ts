@@ -16,6 +16,8 @@ export interface MedicationEntry {
   frequency?: string;
 }
 
+export type AppLanguageCode = string;
+
 export interface PatientMemory {
   patientName: string;
   setupComplete: boolean;
@@ -39,6 +41,7 @@ export interface PatientMemory {
   preferredVoice?: 'male' | 'female' | 'custom';
   clonedVoiceId?: string;
   clonedVoiceName?: string;
+  preferredLanguage?: AppLanguageCode;
 }
 
 export const DEFAULT_PATIENT_MEMORY: PatientMemory = {

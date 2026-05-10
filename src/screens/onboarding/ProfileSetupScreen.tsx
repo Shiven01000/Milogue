@@ -8,6 +8,7 @@ import {
   Platform,
   TouchableOpacity,
   Text,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +23,8 @@ import { useMemoryStore } from '@/store/memoryStore';
 import { RootStackParamList } from '@/navigation/types';
 import { isNonEmpty } from '@/utils/validation';
 import { VoiceGender } from '@/services/tts/elevenlabsTtsService';
+import { AppLanguageCode } from '@/types/memory';
+import { LANGUAGES, getLanguageName } from '@/constants/languages';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -79,6 +82,117 @@ const chipStyles = StyleSheet.create({
   labelActive: { color: colors.primary },
 });
 
+function LanguagePicker({
+  value,
+  onChange,
+}: {
+  value: AppLanguageCode;
+  onChange: (code: AppLanguageCode) => void;
+}) {
+  const [query, setQuery] = useState('');
+
+  const filtered = query.trim()
+    ? LANGUAGES.filter(l => l.label.toLowerCase().includes(query.toLowerCase()))
+    : LANGUAGES;
+
+  const showing = filtered.slice(0, 6);
+  const overflow = filtered.length - showing.length;
+  const selectedLabel = getLanguageName(value);
+
+  return (
+    <View style={lpStyles.wrap}>
+      <View style={lpStyles.selectedRow}>
+        <Text style={lpStyles.selectedGlobe}>🌐</Text>
+        <Text style={lpStyles.selectedLabel}>{selectedLabel}</Text>
+      </View>
+      <TextInput
+        style={lpStyles.search}
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search languages…"
+        placeholderTextColor={colors.textTertiary}
+        autoCorrect={false}
+      />
+      <View style={lpStyles.list}>
+        {showing.map(lang => {
+          const active = lang.code === value;
+          return (
+            <TouchableOpacity
+              key={lang.code}
+              onPress={() => { onChange(lang.code); setQuery(''); }}
+              style={[lpStyles.item, active && lpStyles.itemActive]}
+              activeOpacity={0.7}
+            >
+              <Text style={[lpStyles.itemText, active && lpStyles.itemTextActive]}>
+                {lang.label}
+              </Text>
+              {active && <Text style={lpStyles.check}>✓</Text>}
+            </TouchableOpacity>
+          );
+        })}
+        {filtered.length === 0 && (
+          <Text style={lpStyles.hint}>No match — try a different spelling.</Text>
+        )}
+        {overflow > 0 && (
+          <Text style={lpStyles.hint}>+{overflow} more — keep typing to filter.</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const lpStyles = StyleSheet.create({
+  wrap: { gap: 8 },
+  selectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.primaryFaint,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  selectedGlobe: { fontSize: 14 },
+  selectedLabel: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  search: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    fontSize: 14,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+  },
+  list: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    paddingHorizontal: spacing.base,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  itemActive: { backgroundColor: colors.primaryFaint },
+  itemText: { fontSize: 14, color: colors.textPrimary },
+  itemTextActive: { color: colors.primary, fontWeight: '700' },
+  check: { fontSize: 13, color: colors.primary, fontWeight: '700' },
+  hint: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    padding: spacing.sm,
+    textAlign: 'center',
+  },
+});
+
 export function ProfileSetupScreen() {
   const navigation = useNavigation<Nav>();
   const { updateMemory } = useMemoryStore();
@@ -91,6 +205,7 @@ export function ProfileSetupScreen() {
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [conditions, setConditions] = useState<string[]>([]);
   const [preferredVoice, setPreferredVoice] = useState<VoiceGender | 'custom' | undefined>(undefined);
+  const [language, setLanguage] = useState<AppLanguageCode>('en');
   const [saving, setSaving] = useState(false);
 
   const canContinue = isNonEmpty(name);
@@ -111,6 +226,7 @@ export function ProfileSetupScreen() {
       conditions,
       patientCode,
       preferredVoice: (preferredVoice === 'custom' ? 'female' : preferredVoice) ?? 'female',
+      preferredLanguage: language,
       setupComplete: true,
     });
     setSaving(false);
@@ -127,6 +243,11 @@ export function ProfileSetupScreen() {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <ProgressDots total={2} current={0} />
           <H2 style={styles.heading}>Let's get to know you</H2>
           <Body color={colors.textSecondary} style={styles.sub}>
@@ -208,6 +329,11 @@ export function ProfileSetupScreen() {
           </View>
 
           <View style={styles.field}>
+            <Label>Preferred language</Label>
+            <LanguagePicker value={language} onChange={setLanguage} />
+          </View>
+
+          <View style={styles.field}>
             <Label>Milo's voice</Label>
             <Text style={styles.voiceHint}>Pick a voice and tap Sample to hear it.</Text>
             <VoicePicker value={preferredVoice} onChange={setPreferredVoice} />
@@ -229,6 +355,7 @@ export function ProfileSetupScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { padding: spacing.base, paddingBottom: spacing.xxl, gap: spacing.base },
+  logo: { width: 72, height: 72, marginLeft: -spacing.base, alignSelf: 'flex-start', opacity: 0.9 },
   heading: { marginTop: spacing.base },
   sub: { lineHeight: 22 },
   field: { gap: spacing.xs },

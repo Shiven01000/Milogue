@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, SafeAreaView, View, Text, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { ScrollView, StyleSheet, SafeAreaView, View, Text, TouchableOpacity, Image } from 'react-native';
+import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NextCheckinBanner } from '@/components/dashboard/NextCheckinBanner';
 import { HealthSummaryCard } from '@/components/dashboard/HealthSummaryCard';
@@ -18,15 +19,18 @@ import { loadDoctorProfile } from '@/services/storage/doctorStorage';
 import { CheckinSession } from '@/types/checkin';
 import { DoctorProfile } from '@/types/doctor';
 import { calculateStreak, todayISO } from '@/utils/dateUtils';
-import { RootStackParamList } from '@/navigation/types';
+import { RootStackParamList, TabParamList } from '@/navigation/types';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 const FEATURES = [
-  { key: 'mood',  label: 'Mood\nJournal',   top: '#3ECFBE', bot: '#1AAC99', shadow: '#0D7A6E', emoji: '🌿', nav: 'CheckinStart' as const },
-  { key: 'sleep', label: 'Sleep\nInsights', top: '#60A5FA', bot: '#3B82F6', shadow: '#1D4ED8', emoji: '🌙', nav: null },
-  { key: 'voice', label: 'Voice\nCheck-in', top: '#A78BFA', bot: '#7C3AED', shadow: '#4C1D95', emoji: '🎙️', nav: 'CheckinStart' as const },
-  { key: 'vocab', label: 'Emotion\nVocab',  top: '#F472B6', bot: '#DB2777', shadow: '#831843', emoji: '💬', nav: 'VocabularyFlashcards' as const },
+  { key: 'medications', label: 'Medications',    top: '#FB923C', bot: '#EA580C', shadow: '#9A3412', emoji: '💊', nav: 'Medications'         as const },
+  { key: 'history',     label: 'History',        top: '#60A5FA', bot: '#3B82F6', shadow: '#1D4ED8', emoji: '📅', nav: 'History'             as const },
+  { key: 'learn',       label: 'Learn',          top: '#A78BFA', bot: '#7C3AED', shadow: '#4C1D95', emoji: '🧠', nav: 'Learn'               as const },
+  { key: 'vocab',       label: 'Emotion\nVocab', top: '#F472B6', bot: '#DB2777', shadow: '#831843', emoji: '💬', nav: 'VocabularyFlashcards' as const },
 ];
 
 function FeatureCard({ item, onPress }: { item: typeof FEATURES[0]; onPress: () => void }) {
@@ -67,10 +71,27 @@ export function HomeScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.viewBadge}>Patient View</Text>
-          <Text style={styles.eyebrow}>{getGreeting()}</Text>
-          <Text style={styles.heroName}>{name ? `Hey, ${name} 👋` : 'Hey there 👋'}</Text>
-          <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.headerLeft}>
+              <Image
+                source={require('../../../assets/logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Text style={styles.eyebrow}>{getGreeting()}</Text>
+              <Text style={styles.heroName}>{name ? `Hey, ${name} 👋` : 'Hey there 👋'}</Text>
+              <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('PatientProfile')}
+              style={styles.profileBtn}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Open profile"
+            >
+              <Text style={styles.profileIcon}>👤</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <NextCheckinBanner hasCheckedInToday={hasCheckedInToday} onPress={() => navigation.navigate('CheckinStart')} />
@@ -96,14 +117,7 @@ export function HomeScreen() {
             <FeatureCard
               key={item.key}
               item={item}
-              onPress={() => {
-                if (!item.nav) return;
-                if (item.nav === 'VocabularyFlashcards') {
-                  navigation.navigate('VocabularyFlashcards');
-                } else {
-                  navigation.navigate(item.nav);
-                }
-              }}
+              onPress={() => navigation.navigate(item.nav)}
             />
           ))}
         </View>
@@ -120,7 +134,7 @@ export function HomeScreen() {
           </View>
         ) : null}
 
-        <Text style={[styles.sectionLabel, { marginTop: spacing.sm }]}>Today's Body</Text>
+        <Text style={[styles.sectionLabel, { marginTop: spacing.sm }]}>Today's Smartwatch Data</Text>
         <HealthSummaryCard snapshot={todaySnapshot} />
       </ScrollView>
     </SafeAreaView>
@@ -138,19 +152,25 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.base, paddingBottom: 100 },
   header: { marginBottom: spacing.lg },
-  viewBadge: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-    color: colors.primary,
-    textTransform: 'uppercase',
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  headerLeft: { flex: 1 },
+  profileBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: colors.primaryFaint,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  profileIcon: { fontSize: 20 },
+  logo: {
+    width: 90,
+    height: 90,
+    marginLeft: -spacing.base,
+    marginBottom: spacing.sm,
+    opacity: 0.88,
     alignSelf: 'flex-start',
-    marginBottom: spacing.xs,
-    overflow: 'hidden',
   },
   eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.4, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 2 },
   heroName: { fontSize: 25, fontWeight: '900', color: colors.textPrimary, lineHeight: 30 },

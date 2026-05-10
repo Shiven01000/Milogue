@@ -5,12 +5,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Display, Body, BodySmall } from '@/components/common/Typography';
+import { Body, BodySmall } from '@/components/common/Typography';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
 import { saveAppRole } from '@/services/storage/doctorStorage';
@@ -43,7 +44,11 @@ export function RoleSelectionScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.hero}>
-          <Display style={styles.logo}>MindLog</Display>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Body color={colors.textSecondary} style={styles.tagline}>
             Who are you today?
           </Body>
@@ -147,7 +152,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
   },
   hero: { flex: 1, justifyContent: 'center' },
-  logo: { color: colors.primary, marginBottom: spacing.sm },
+  logo: { width: 180, height: 180, alignSelf: 'center', marginBottom: spacing.lg, opacity: 0.9 },
   tagline: { fontSize: 18, lineHeight: 26 },
   cards: { flexDirection: 'row', gap: 12, marginBottom: spacing.base },
   cardWrap: {

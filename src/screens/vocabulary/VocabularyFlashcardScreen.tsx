@@ -17,6 +17,8 @@ import { spacing } from '@/constants/spacing';
 import { EmotionFlashcard, FlashcardIntensity } from '@/types/vocabulary';
 import { CheckinSession } from '@/types/checkin';
 import { getLastNSessions } from '@/services/storage/checkinStorage';
+import { useMemoryStore } from '@/store/memoryStore';
+import { getLanguageName } from '@/constants/languages';
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 
@@ -83,6 +85,8 @@ function FlashCard({ card, index, total }: { card: EmotionFlashcard; index: numb
 
 export function VocabularyFlashcardScreen() {
   const navigation = useNavigation();
+  const { memory } = useMemoryStore();
+  const languageName = getLanguageName(memory.preferredLanguage ?? 'en');
 
   const [sessions, setSessions] = useState<CheckinSession[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -120,7 +124,7 @@ export function VocabularyFlashcardScreen() {
     setCurrentCard(0);
 
     try {
-      const messages = buildVocabularyFlashcardsMessages(userText);
+      const messages = buildVocabularyFlashcardsMessages(userText, languageName);
       const raw = await chatCompletionJSON(messages, OPENAI_API_KEY, { maxTokens: 1024, temperature: 0.7 });
       const parsed = JSON.parse(raw) as { flashcards: EmotionFlashcard[] };
       if (!parsed.flashcards?.length) throw new Error('empty');

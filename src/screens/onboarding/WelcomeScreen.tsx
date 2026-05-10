@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Display, Body } from '@/components/common/Typography';
+import { Body } from '@/components/common/Typography';
 import { Button } from '@/components/common/Button';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
@@ -18,7 +18,11 @@ export function WelcomeScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.hero}>
-          <Display style={styles.logo}>MindLog</Display>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Body color={colors.textSecondary} style={styles.tagline}>
             A quiet space between appointments.{'\n'}
             Your thoughts, remembered.
@@ -54,8 +58,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    color: colors.primary,
-    marginBottom: spacing.base,
+    width: 180,
+    height: 180,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+    opacity: 0.9,
   },
   tagline: {
     lineHeight: 26,

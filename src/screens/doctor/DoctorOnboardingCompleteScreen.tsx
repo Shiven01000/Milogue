@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -28,7 +28,11 @@ export function DoctorOnboardingCompleteScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.hero}>
-          <Text style={styles.badge}>Doctor View</Text>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <H1 color={colors.primary} style={styles.greeting}>
             Welcome,{'\n'}{profile.doctorName || 'Doctor'} 👋
           </H1>
@@ -52,6 +56,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   hero: { flex: 1, justifyContent: 'center', gap: spacing.base },
+  logo: { width: 160, height: 160, alignSelf: 'center', opacity: 0.9 },
   badge: {
     fontSize: 10,
     fontWeight: '800',

@@ -141,7 +141,6 @@ export function DoctorPatientsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.badge}>Doctor View</Text>
           <View style={styles.titleRow}>
             <H2 style={styles.title}>My Patients</H2>
             <TouchableOpacity

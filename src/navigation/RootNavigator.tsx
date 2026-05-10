@@ -15,6 +15,7 @@ import { CheckinStartScreen } from '@/screens/checkin/CheckinStartScreen';
 import { IncomingCallScreen } from '@/screens/incoming-call/IncomingCallScreen';
 import { VocabularyFlashcardScreen } from '@/screens/vocabulary/VocabularyFlashcardScreen';
 import { VoiceCloningScreen } from '@/screens/patient/VoiceCloningScreen';
+import { PatientProfileScreen } from '@/screens/patient/PatientProfileScreen';
 import { RootStackParamList } from './types';
 import { useMemoryStore } from '@/store/memoryStore';
 import { loadAppRole, loadDoctorProfile } from '@/services/storage/doctorStorage';
@@ -73,6 +74,7 @@ export function RootNavigator() {
       <Stack.Screen name="IncomingCall" component={IncomingCallScreen} options={{ headerShown: false, animation: 'slide_from_bottom' }} />
       <Stack.Screen name="VocabularyFlashcards" component={VocabularyFlashcardScreen} options={{ headerShown: false }} />
       <Stack.Screen name="VoiceCloning" component={VoiceCloningScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PatientProfile" component={PatientProfileScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
     </Stack.Navigator>
   );
 }

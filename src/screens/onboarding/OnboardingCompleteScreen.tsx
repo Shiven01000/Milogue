@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -25,6 +25,11 @@ export function OnboardingCompleteScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.hero}>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <H1 color={colors.primary} style={styles.greeting}>
             Hi, {memory.patientName || 'there'} 👋
           </H1>
@@ -45,6 +50,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, padding: spacing.base, justifyContent: 'space-between', paddingBottom: spacing.xl },
   hero: { flex: 1, justifyContent: 'center' },
+  logo: { width: 160, height: 160, alignSelf: 'center', marginBottom: spacing.lg, opacity: 0.9 },
   greeting: { marginBottom: spacing.lg },
   body: { lineHeight: 26 },
 });

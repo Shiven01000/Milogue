@@ -97,6 +97,7 @@ export function CheckinConversationScreen() {
         const photo = await cameraRef.current?.takePictureAsync({
           base64: true,
           quality: 0.3,
+          shutterSound: false,
         });
         if (!photo?.base64) return;
         const emotion = await detectFacialEmotion(photo.base64, OPENAI_API_KEY);
@@ -135,10 +136,13 @@ export function CheckinConversationScreen() {
 
   // Opening greeting
   useEffect(() => {
-    const { id, text } = openingGreeting();
-    lastSpokenId.current = id;
-    speak(text);
-    return () => { stopSpeaking(); };
+    let cancelled = false;
+    const { id, textPromise } = openingGreeting();
+    lastSpokenId.current = id; // set synchronously so the messages watcher won't double-speak
+    textPromise.then(text => {
+      if (!cancelled) speak(text);
+    });
+    return () => { cancelled = true; stopSpeaking(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

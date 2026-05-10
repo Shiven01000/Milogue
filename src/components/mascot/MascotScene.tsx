@@ -248,6 +248,7 @@ export default function MascotScene({ state }: Props) {
       scheduleMicro();
     } else if (state === 'speaking') {
       breathRef.current = breath(1400); breathRef.current.start();
+      legRef.current    = legLoop(1800); legRef.current.start();
       mouthRef.current  = Animated.loop(Animated.sequence([
         Animated.timing(mouthAnim, { toValue: 1,    duration: 175, useNativeDriver: true }),
         Animated.timing(mouthAnim, { toValue: 0.22, duration: 175, useNativeDriver: true }),
@@ -638,11 +639,11 @@ export default function MascotScene({ state }: Props) {
                 <Ellipse cx={MILO_W/2} cy={MILO_H*0.613} rx={6}   ry={2}  fill="#FFFFFF" opacity={0.14} />
               </>
             ) : state === 'happy' ? (
-              <Path d={`M${MILO_W*0.31},${MILO_H*0.575} Q${MILO_W*0.5},${MILO_H*0.745} ${MILO_W*0.69},${MILO_H*0.575}`}
+              <Path d={`M${MILO_W*0.41},${MILO_H*0.565} Q${MILO_W*0.5},${MILO_H*0.740} ${MILO_W*0.59},${MILO_H*0.565}`}
                 stroke="#1A1828" strokeWidth={2.8} fill="none" strokeLinecap="round" />
             ) : (
-              // Default idle/listening smile — wide and genuinely happy
-              <Path d={`M${MILO_W*0.28},${MILO_H*0.555} Q${MILO_W*0.5},${MILO_H*0.840} ${MILO_W*0.72},${MILO_H*0.555}`}
+              // Default idle/listening smile — inner-eye width, upturned
+              <Path d={`M${MILO_W*0.41},${MILO_H*0.565} Q${MILO_W*0.5},${MILO_H*0.760} ${MILO_W*0.59},${MILO_H*0.565}`}
                 stroke="#1A1828" strokeWidth={2.8} fill="none" strokeLinecap="round" />
             )}
           </Svg>

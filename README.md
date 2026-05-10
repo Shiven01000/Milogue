@@ -79,19 +79,19 @@ The app has two views:
 - Search any medication via OpenFDA or GPT-4o fallback
 - Image-based pill recognition using GPT-4o Vision
 - Plain-language explanations: what it does, why doctors prescribe it, common and serious side effects, questions to ask your pharmacist
-- Multi-language: English, Bengali, Arabic, French
+- Responds in the patient's preferred language (80+ languages, set once during onboarding)
 - Strict safety net: refuses dosing advice or personal medical guidance
 
 **Mental Health Education (Conditions)**
 - Learn about diagnosed conditions in simple, jargon-free language
 - AI-generated explanations with symptom lists and educational disclaimers
 - "Ask or Explore" section: ask a question or describe symptoms to find related conditions
-- Multi-language support
+- Responds in the patient's preferred language (80+ languages)
 - Content is scoped to the patient's diagnosed conditions only
 
 **Check-in History**
 - All sessions listed chronologically, grouped by week
-- Each entry shows: mood score, emotion tags, session summary, T-LICC coverage
+- Tap any session to expand: full T-LICC coverage badges, duration, mood scores, emotion tags, and conversation transcript
 
 **Voice Cloning**
 - Record a voice sample and clone it via ElevenLabs
@@ -204,7 +204,7 @@ src/
 ├── screens/
 │   ├── onboarding/
 │   │   ├── WelcomeScreen.tsx
-│   │   ├── ProfileSetupScreen.tsx # Name, conditions, medications, voice, doctor assignment
+│   │   ├── ProfileSetupScreen.tsx # Name, conditions, medications, language (80+), voice, doctor assignment
 │   │   └── OnboardingCompleteScreen.tsx
 │   ├── home/
 │   │   └── HomeScreen.tsx         # Dashboard: streak, mood trend, health summary, feature cards
@@ -326,7 +326,7 @@ Scan the QR code with **Expo Go** on your iPhone. The app will load with 30 days
 ### Full Patient Flow (end to end)
 
 1. **Launch** → select **Patient** on the role selection screen
-2. **Onboarding** → enter name, select conditions (e.g. Anxiety, ADHD), add medications if any, choose a voice preference
+2. **Onboarding** → enter name, select conditions (e.g. Anxiety, ADHD), add medications, choose a language (80+ available with search), choose a voice preference
 3. **Home screen** → tap **Start Check-In**
 4. **Mood slider** → rate your current mood (1–10), tap Continue
 5. **Conversation screen** → Milo greets you. Tap the record button, speak, release. Milo responds via voice and animated subtitles

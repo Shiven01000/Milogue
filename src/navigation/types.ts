@@ -14,13 +14,13 @@ export type RootStackParamList = {
   IncomingCall: undefined;
   VocabularyFlashcards: undefined;
   VoiceCloning: undefined;
+  PatientProfile: undefined;
 };
 
 export type TabParamList = {
   Home: undefined;
   History: undefined;
   Medications: undefined;
-  Profile: undefined;
   Learn: undefined;
 };
 

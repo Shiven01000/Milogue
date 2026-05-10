@@ -10,7 +10,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -31,7 +37,7 @@ import {
 import { chatCompletionJSON, chatCompletion, ChatMessage } from '@/api/openai';
 import { parseClinicalSummaryFromJSON, formatEmotionArc } from '@/utils/reportFormatter';
 import { daysAgo, todayISO } from '@/utils/dateUtils';
-import { CheckinSession } from '@/types/checkin';
+import { CheckinSession, TLICCCoverage } from '@/types/checkin';
 import { MedicationEntry } from '@/types/memory';
 import { ClinicalSummary } from '@/types/report';
 import { HealthSnapshot } from '@/types/health';
@@ -85,6 +91,130 @@ function sleepColor(snap: HealthSnapshot): string {
     default:
       return colors.moodLow;
   }
+}
+
+const TLICC_KEYS: { label: string; key: keyof TLICCCoverage }[] = [
+  { label: 'Time', key: 'time' },
+  { label: 'Location', key: 'location' },
+  { label: 'Intensity', key: 'intensity' },
+  { label: 'Context', key: 'context' },
+  { label: 'Change', key: 'change' },
+];
+
+function ExpandableSessionRow({ session }: { session: CheckinSession }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const durationMin =
+    session.completedAt && session.startedAt
+      ? Math.round((session.completedAt - session.startedAt) / 60000)
+      : null;
+
+  const userMessages = session.messages.filter(m => m.role === 'user');
+
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(v => !v);
+  };
+
+  return (
+    <View style={styles.sessionRow}>
+      <TouchableOpacity
+        onPress={toggle}
+        activeOpacity={0.72}
+        style={styles.sessionRowHeader}
+      >
+        <View
+          style={[
+            styles.moodBadge,
+            { backgroundColor: moodColor(session.moodScoreAtStart) + '22' },
+          ]}
+        >
+          <Text style={[styles.moodScore, { color: moodColor(session.moodScoreAtStart) }]}>
+            {session.moodScoreAtStart}
+          </Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sessionDateText}>
+            {new Date(session.startedAt).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </Text>
+          <Text style={styles.sessionPreviewText} numberOfLines={expanded ? undefined : 2}>
+            {session.sessionSummary ||
+              session.messages.find(m => m.role === 'user')?.content?.slice(0, 80) ||
+              'No summary'}
+          </Text>
+        </View>
+        <Text style={styles.sessionChevron}>{expanded ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={styles.sessionExpanded}>
+          {/* T-LICC coverage */}
+          <View style={styles.tliccRow}>
+            {TLICC_KEYS.map(({ label, key }) => {
+              const hit = session.tliccCoverage[key];
+              return (
+                <View
+                  key={key}
+                  style={[styles.tliccBadge, hit ? styles.tliccBadgeHit : styles.tliccBadgeMiss]}
+                >
+                  <Text style={[styles.tliccCheck, hit ? styles.tliccHit : styles.tliccMiss]}>
+                    {hit ? '✓' : '✗'}
+                  </Text>
+                  <Text style={[styles.tliccLabel, hit ? styles.tliccHit : styles.tliccMiss]}>
+                    {label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Stats */}
+          <View style={styles.sessionStatsRow}>
+            {durationMin !== null && (
+              <Text style={styles.sessionStatChip}>{durationMin} min</Text>
+            )}
+            {session.moodScoreAtEnd !== undefined && (
+              <Text style={styles.sessionStatChip}>
+                Mood {session.moodScoreAtStart} → {session.moodScoreAtEnd}
+              </Text>
+            )}
+            {session.sessionAvgHR !== undefined && (
+              <Text style={styles.sessionStatChip}>
+                ♥ {Math.round(session.sessionAvgHR)} bpm avg
+              </Text>
+            )}
+          </View>
+
+          {/* Emotion tags */}
+          {session.emotionTags.length > 0 && (
+            <View style={styles.sessionTagsRow}>
+              {session.emotionTags.map((tag, i) => (
+                <View key={i} style={styles.sessionTag}>
+                  <Text style={styles.sessionTagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Transcript — patient messages */}
+          {userMessages.length > 0 && (
+            <View style={styles.transcriptSection}>
+              <Text style={styles.transcriptLabel}>PATIENT'S WORDS</Text>
+              {userMessages.map((m, i) => (
+                <View key={i} style={styles.transcriptBubble}>
+                  <Text style={styles.transcriptText}>{m.content}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
 }
 
 function dayLabel(dateStr: string): string {
@@ -553,40 +683,13 @@ export function PatientDetailScreen() {
           </Card>    
 
           {/* Check-in History */}
-          <Card style={styles.section}>
+          <Card style={styles.sessionCard}>
             <H3 style={styles.sectionTitle}>Recent Check-ins</H3>
             {!isConnected || sessions.length === 0 ? (
               <BodySmall color={colors.textTertiary}>No sessions available.</BodySmall>
             ) : (
               sessions.map(s => (
-                <View key={s.id} style={styles.sessionRow}>
-                  <View
-                    style={[
-                      styles.moodBadge,
-                      { backgroundColor: moodColor(s.moodScoreAtStart) + '22' },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.moodScore, { color: moodColor(s.moodScoreAtStart) }]}
-                    >
-                      {s.moodScoreAtStart}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Label>
-                      {new Date(s.startedAt).toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </Label>
-                    <BodySmall color={colors.textSecondary} numberOfLines={2}>
-                      {s.sessionSummary ||
-                        s.messages.find(m => m.role === 'user')?.content?.slice(0, 80) ||
-                        'No summary'}
-                    </BodySmall>
-                  </View>
-                </View>
+                <ExpandableSessionRow key={s.id} session={s} />
               ))
             )}
           </Card>
@@ -858,14 +961,90 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     backgroundColor: colors.background,
   },
+  sessionCard: { gap: spacing.sm, padding: 0, overflow: 'hidden' },
   sessionRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-start',
-    paddingVertical: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+  sessionRowHeader: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.base,
+  },
+  sessionDateText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  sessionPreviewText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 17,
+  },
+  sessionChevron: { fontSize: 9, color: colors.textTertiary, marginTop: 4 },
+  sessionExpanded: {
+    backgroundColor: colors.surfaceAlt,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    padding: spacing.base,
+    gap: spacing.sm,
+  },
+  tliccRow: { flexDirection: 'row', gap: 5, flexWrap: 'wrap' },
+  tliccBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  tliccBadgeHit: { backgroundColor: colors.primaryFaint, borderColor: colors.primary + '44' },
+  tliccBadgeMiss: { backgroundColor: colors.overlayLight, borderColor: colors.border },
+  tliccCheck: { fontSize: 9, fontWeight: '800' },
+  tliccLabel: { fontSize: 9, fontWeight: '700' },
+  tliccHit: { color: colors.primary },
+  tliccMiss: { color: colors.textTertiary },
+  sessionStatsRow: { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
+  sessionStatChip: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    backgroundColor: colors.surface,
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  sessionTagsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  sessionTag: {
+    backgroundColor: colors.primary + '18',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  sessionTagText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+  transcriptSection: { gap: 5 },
+  transcriptLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.3,
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+  },
+  transcriptBubble: {
+    backgroundColor: colors.surface,
+    borderRadius: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  transcriptText: { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
   moodBadge: {
     width: 36,
     height: 36,

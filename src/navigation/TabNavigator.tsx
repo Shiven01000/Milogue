@@ -4,7 +4,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { HomeScreen } from '@/screens/home/HomeScreen';
 import { HistoryScreen } from '@/screens/history/HistoryScreen';
 import { MedicationKnowledgeScreen } from '@/screens/medications/MedicationKnowledgeScreen';
-import { PatientProfileScreen } from '@/screens/patient/PatientProfileScreen';
 import { TabParamList } from './types';
 import { colors } from '@/constants/colors';
 import { ConditionsScreen } from '@/screens/conditions/ConditionsScreen';
@@ -57,13 +56,6 @@ export function TabNavigator() {
         options={{
           tabBarLabel: 'Medications',
           tabBarIcon: ({ focused }) => <TabIcon icon="💊" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={PatientProfileScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} />,
         }}
       />
       <Tab.Screen

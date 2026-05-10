@@ -3,6 +3,7 @@ import { useCheckinStore } from '@/store/checkinStore';
 import { useMemoryStore } from '@/store/memoryStore';
 import { useHealthStore } from '@/store/healthStore';
 import { buildCheckinMessages, buildSessionSummaryMessages } from '@/api/prompts';
+import { getLanguageName } from '@/constants/languages';
 import { chatCompletion } from '@/api/openai';
 import { ChatMessage } from '@/api/openai';
 import { ConversationMessage, TLICCCoverage } from '@/types/checkin';
@@ -69,7 +70,8 @@ export function useCheckin() {
         content: m.content,
       }));
 
-      const messages = buildCheckinMessages(memory, todaySnapshot, history, store.currentDetectedEmotion);
+      const languageName = getLanguageName(memory.preferredLanguage ?? 'en');
+      const messages = buildCheckinMessages(memory, todaySnapshot, history, store.currentDetectedEmotion, languageName);
 
       // Placeholder for AI response while fetching
       const aiMessageId = generateId();
@@ -113,7 +115,7 @@ export function useCheckin() {
 
     let sessionSummary = '';
     try {
-      const summaryMessages = buildSessionSummaryMessages(transcript, memory.patientName);
+      const summaryMessages = buildSessionSummaryMessages(transcript, memory.patientName, getLanguageName(memory.preferredLanguage ?? 'en'));
       sessionSummary = await chatCompletion(summaryMessages, OPENAI_API_KEY, {
         temperature: 0.3,
         maxTokens: 128,
@@ -150,15 +152,47 @@ export function useCheckin() {
     return session;
   }, [store, memory, todaySnapshot, memoryStore]);
 
-  const openingGreeting = useCallback((): { id: string; text: string } => {
+  const openingGreeting = useCallback((): { id: string; textPromise: Promise<string> } => {
     const id = generateId();
     const name = memory.patientName || 'there';
-    const text = memory.lastSessionSummary
-      ? `Hey ${name}, really good to see you again! How have you been since we last spoke?`
-      : `Hey ${name}! I'm Milo, your wellness companion. How are you feeling today?`;
+    const languageName = getLanguageName(memory.preferredLanguage ?? 'en');
 
-    store.addMessage({ id, role: 'assistant', content: text, timestamp: Date.now(), isStreaming: false });
-    return { id, text };
+    // Add placeholder immediately so the messages watcher sees isStreaming:true and won't speak it
+    store.addMessage({ id, role: 'assistant', content: '', timestamp: Date.now(), isStreaming: true });
+
+    const textPromise = (async (): Promise<string> => {
+      let text: string;
+
+      if (languageName !== 'English' && OPENAI_API_KEY) {
+        const systemContent = memory.lastSessionSummary
+          ? `You are Milo, a warm mental wellness companion. Generate a brief warm welcoming greeting for ${name} in ${languageName}. Mention you're glad to reconnect and ask how they've been since you last spoke. 1-2 sentences, plain text only.`
+          : `You are Milo, a warm mental wellness companion. Generate a brief welcoming greeting for ${name} in ${languageName}. Introduce yourself as Milo their wellness companion and ask how they're feeling today. 1-2 sentences, plain text only.`;
+        try {
+          text = await chatCompletion(
+            [
+              { role: 'system', content: systemContent },
+              { role: 'user', content: 'hello' },
+            ],
+            OPENAI_API_KEY,
+            { temperature: 0.8, maxTokens: 80 },
+          );
+        } catch {
+          text = memory.lastSessionSummary
+            ? `Hey ${name}, really good to see you again! How have you been since we last spoke?`
+            : `Hey ${name}! I'm Milo, your wellness companion. How are you feeling today?`;
+        }
+      } else {
+        text = memory.lastSessionSummary
+          ? `Hey ${name}, really good to see you again! How have you been since we last spoke?`
+          : `Hey ${name}! I'm Milo, your wellness companion. How are you feeling today?`;
+      }
+
+      // updateLastMessage appends delta to content ('' + text) and sets isStreaming:false
+      store.updateLastMessage(text);
+      return text;
+    })();
+
+    return { id, textPromise };
   }, [store, memory]);
 
   return {

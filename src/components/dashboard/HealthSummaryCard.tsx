@@ -31,7 +31,6 @@ export function HealthSummaryCard({ snapshot }: HealthSummaryCardProps) {
 
   return (
     <Card style={styles.card}>
-      <Text style={styles.title}>Today's Body</Text>
       <View style={styles.grid}>
         <Metric label="Sleep" value={String(snapshot.sleep.durationHours)} unit="hrs" sub={snapshot.sleep.quality} />
         <Metric label="HRV" value={String(snapshot.hrv.morningHRV)} unit="ms" sub={snapshot.hrv.trend.replace(/_/g, ' ')} />
