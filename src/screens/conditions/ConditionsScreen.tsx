@@ -29,7 +29,7 @@ import {
   ConditionId,
   ConditionLanguageCode,
   ExploreResult,
-} from '@/types/condition';
+} from '@/types/conditions';
 import { chatCompletion, chatCompletionJSON } from '@/api/openai';
 import {
   buildConditionExploreMessages,

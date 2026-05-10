@@ -14,7 +14,7 @@ import { EmotionFlashcard } from '@/types/vocabulary';
 import {
   ConditionExplanation,
   ConditionLanguageCode,
-} from '@/types/condition';
+} from '@/types/conditions';
 
 
 function formatMedications(memory: PatientMemory): string {
@@ -172,7 +172,7 @@ export function buildClinicalReportMessages(
     steps: number;
   }>
 ): ChatMessage[] {
-  const systemPrompt = `You are a clinical AI assistant generating a structured summary report for a psychiatrist or therapist. The report covers ${patientName}'s last ${sessions.length} check-in sessions combined with Apple Watch wearable data.
+  const systemPrompt = `You are a clinical AI assistant generating a structured summary report for a psychiatrist or therapist. The report covers ${patientName}'s last ${sessions.length} check-in sessions combined with Fitbit Charge 6 wearable data.
 
 Return a JSON object with this exact schema:
 {
@@ -226,7 +226,7 @@ export function buildDoctorFollowupMessages(
 
   const systemPrompt = `You are a clinical AI assistant helping a doctor review patient data for ${patientName}.
 
-The following clinical report was just generated from ${patientName}'s recent check-in sessions and Apple Watch wearable data:
+The following clinical report was just generated from ${patientName}'s recent check-in sessions and Fitbit Charge 6 wearable data:
 
 ${reportContext}
 

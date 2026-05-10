@@ -37,5 +37,6 @@ export interface CheckinSession {
   tliccCoverage: TLICCCoverage;
   sessionSummary: string;
   healthSnapshotId: string;
+  sessionAvgHR?: number;
   emotionTimeline?: EmotionSample[];
 }

@@ -594,7 +594,13 @@ export function PatientDetailScreen() {
           {/* Wearable Trends */}
           {isConnected && healthRange.length > 0 && (
             <Card style={styles.section}>
-              <H3 style={styles.sectionTitle}>Wearable Trends (7-Day)</H3>
+              <View style={styles.wearableHeaderRow}>
+                <H3 style={styles.sectionTitle}>Wearable Trends (7-Day)</H3>
+                <View style={styles.fitbitBadge}>
+                  <View style={styles.fitbitDot} />
+                  <Text style={styles.fitbitBadgeText}>Fitbit Charge 6</Text>
+                </View>
+              </View>
               <WearableBarChart
                 data={healthRange}
                 getValue={s => s.hrv.morningHRV}
@@ -869,6 +875,33 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   moodScore: { fontSize: 15, fontWeight: '800' },
+  // Wearable header + Fitbit badge
+  wearableHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  fitbitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(52,199,89,0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  fitbitDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34C759',
+  },
+  fitbitBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#34C759',
+  },
   // Wearable chart
   chartValue: { fontSize: 9, color: colors.textTertiary, marginBottom: 2 },
   chartLabel: { fontSize: 9, color: colors.textTertiary, marginTop: 3 },

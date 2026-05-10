@@ -21,6 +21,7 @@ export type TabParamList = {
   History: undefined;
   Medications: undefined;
   Profile: undefined;
+  Learn: undefined;
 };
 
 export type DoctorTabParamList = {
