@@ -26,7 +26,12 @@
       "Bash(npm uninstall *)",
       "Bash(pkill -f \"expo start\")",
       "Bash(pkill -f \"metro\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(git -C /Users/fnaim06/Desktop/Milogue add src/api/prompts.ts src/navigation/RootNavigator.tsx src/navigation/types.ts src/screens/conditions/ConditionsScreen.tsx src/screens/medications/MedicationKnowledgeScreen.tsx src/screens/patient/PatientProfileScreen.tsx)",
+      "Bash(git -C /Users/fnaim06/Desktop/Milogue status --short)",
+      "Bash(git -C /Users/fnaim06/Desktop/Milogue status)",
+      "Bash(git -C /Users/fnaim06/Desktop/Milogue diff --name-only HEAD)",
+      "Bash(git *)"
     ]
   }
 }
