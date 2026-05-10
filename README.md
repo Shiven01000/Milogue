@@ -1,5 +1,7 @@
 # 🧠 Milogue
 
+https://canva.link/yiyysixbjyjd0pb 
+
 > **Daily AI check-ins. Wearable-correlated insights. Clinical-ready reports.**
 
 Built for the **natIgnite 2026 AccessTech Hackathon** — 40 hours.
