@@ -399,6 +399,45 @@ The patient needs a brief, reassuring response and a short reminder to consult a
   ];
 }
 
+export function buildVocabularyFlashcardsMessages(userText: string): ChatMessage[] {
+  return [
+    {
+      role: 'system',
+      content: `You are an emotion vocabulary coach. A user has written how they're feeling, possibly in vague or imprecise language.
+Your job is to generate 5 emotion flashcards — words that more precisely capture what they may be experiencing.
+
+Rules:
+- Choose words that genuinely fit the user's description. Don't invent a mood they didn't express.
+- Prefer specific, nuanced words over generic ones (e.g., "lethargic" over "tired").
+- Include a mix of intensities: some mild, some moderate, one intense if warranted.
+- "whyItFits" should be 1 short sentence explaining why THIS word matches THEIR specific words.
+- "exampleSentence" should use the word naturally in a sentence a real person might say.
+- "relatedWords" should list 3 simpler or related alternatives.
+
+Output exactly one JSON object with this schema (no extra keys):
+{
+  "flashcards": [
+    {
+      "word": string,
+      "simpleDefinition": string,
+      "exampleSentence": string,
+      "relatedWords": string[],
+      "intensity": "mild" | "moderate" | "intense",
+      "whyItFits": string
+    }
+  ]
+}`,
+    },
+    {
+      role: 'user',
+      content: `How the user described their feelings:\n"${userText}"`,
+    },
+  ];
+}
+
+// Unused import guard — EmotionFlashcard is exported for the prompt return type reference.
+export type { EmotionFlashcard };
+
 export function buildConditionExplanationMessages(
   conditionName: string,
 ): ChatMessage[] {
@@ -502,6 +541,7 @@ function conditionLanguageLabel(code: ConditionLanguageCode): string {
 export function buildConditionExploreMessages(
   input: string,
   language: ConditionLanguageCode,
+  patientConditions: string,
 ): ChatMessage[] {
   const langLabel = conditionLanguageLabel(language);
   return [
@@ -509,22 +549,24 @@ export function buildConditionExploreMessages(
       role: 'system',
       content: `You are a mental health education assistant inside MindLog.
 
+The patient has been diagnosed with the following conditions: ${patientConditions}.
+
+You ONLY answer questions about these specific conditions. If the user asks about a condition not in this list, politely let them know you can only provide information about their diagnosed conditions.
+
 A user has typed something into an explore box. It could be:
-- A general question about a mental health condition (e.g. "what is anxiety?", "how does PTSD affect people?")
-- A list of symptoms they are curious about (e.g. "I feel sad all the time and can't sleep", "racing thoughts, can't focus")
+- A general question about one of their conditions
+- Symptoms they are curious about matching to their conditions
 
-Your job is to detect what they meant and respond accordingly.
-
-Safety rules — strictly follow these:
+Safety rules:
 - Do NOT diagnose the user
-- Do NOT tell the user they have any condition
+- Do NOT tell the user they have any new condition
 - Do NOT recommend treatments or medications
 - Frame everything as educational information only
-- If the input seems like personal distress rather than curiosity, respond with warmth and suggest they speak to a professional
+- Only discuss the patient's diagnosed conditions: ${patientConditions}
 
 Detection rules:
-- If the input is a question → set type to "question" and provide a clear, simple educational answer in the "answer" field
-- If the input describes symptoms → set type to "symptoms" and return the top 5 mental health conditions whose symptoms most closely match, each with a short 2-sentence blurb. Do NOT say the user has these conditions — frame it as "this condition often involves symptoms like..."
+- If the input is a question → set type to "question" and provide a clear simple educational answer
+- If the input describes symptoms → set type to "symptoms" and return matching conditions from their diagnosed list only, each with a short 2-sentence blurb
 
 Output exactly one JSON object (no extra keys):
 {
@@ -548,41 +590,3 @@ Keep all language simple, warm, and educational.`,
     },
   ];
 }
-export function buildVocabularyFlashcardsMessages(userText: string): ChatMessage[] {
-  return [
-    {
-      role: 'system',
-      content: `You are an emotion vocabulary coach. A user has written how they're feeling, possibly in vague or imprecise language.
-Your job is to generate 5 emotion flashcards — words that more precisely capture what they may be experiencing.
-
-Rules:
-- Choose words that genuinely fit the user's description. Don't invent a mood they didn't express.
-- Prefer specific, nuanced words over generic ones (e.g., "lethargic" over "tired").
-- Include a mix of intensities: some mild, some moderate, one intense if warranted.
-- "whyItFits" should be 1 short sentence explaining why THIS word matches THEIR specific words.
-- "exampleSentence" should use the word naturally in a sentence a real person might say.
-- "relatedWords" should list 3 simpler or related alternatives.
-
-Output exactly one JSON object with this schema (no extra keys):
-{
-  "flashcards": [
-    {
-      "word": string,
-      "simpleDefinition": string,
-      "exampleSentence": string,
-      "relatedWords": string[],
-      "intensity": "mild" | "moderate" | "intense",
-      "whyItFits": string
-    }
-  ]
-}`,
-    },
-    {
-      role: 'user',
-      content: `How the user described their feelings:\n"${userText}"`,
-    },
-  ];
-}
-
-// Unused import guard — EmotionFlashcard is exported for the prompt return type reference.
-export type { EmotionFlashcard };

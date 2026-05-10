@@ -20,7 +20,7 @@ import { DetectedEmotion } from '@/types/checkin';
 import { RootStackParamList } from '@/navigation/types';
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
-const EMOTION_INTERVAL_MS = 5000;
+const EMOTION_INTERVAL_MS = 15000;
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 

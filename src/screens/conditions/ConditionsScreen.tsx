@@ -37,21 +37,11 @@ import {
   buildConditionFollowupMessages,
   buildConditionTranslationMessages,
 } from '@/api/prompts';
+import { useMemoryStore } from '@/store/memoryStore';
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 
 // ─── Data ─────────────────────────────────────────────────────
-
-const CONDITIONS: ConditionId[] = [
-  { id: 'depression', name: 'Depression' },
-  { id: 'anxiety', name: 'Anxiety' },
-  { id: 'bipolar', name: 'Bipolar Disorder' },
-  { id: 'adhd', name: 'ADHD' },
-  { id: 'ocd', name: 'OCD' },
-  { id: 'ptsd', name: 'PTSD' },
-  { id: 'schizophrenia', name: 'Schizophrenia' },
-  { id: 'bpd', name: 'Borderline Personality Disorder' },
-];
 
 const LANGUAGE_OPTIONS: Array<{
   code: ConditionLanguageCode;
@@ -131,9 +121,11 @@ function LanguageDropdown({
 
 function ExploreSection({
   language,
+  conditions,
   onNavigateToCondition,
 }: {
   language: ConditionLanguageCode;
+  conditions: ConditionId[];
   onNavigateToCondition: (id: ConditionId) => void;
 }) {
   const [input, setInput] = useState('');
@@ -152,7 +144,8 @@ function ExploreSection({
     setExpandedBlurb(null);
 
     try {
-      const messages = buildConditionExploreMessages(q, language);
+      const conditionNames = conditions.map(c => c.name).join(', ');
+      const messages = buildConditionExploreMessages(q, language, conditionNames);
       const raw = await chatCompletionJSON(
         messages,
         OPENAI_API_KEY,
@@ -167,7 +160,7 @@ function ExploreSection({
     } finally {
       setLoading(false);
     }
-  }, [input, language]);
+  }, [input, language, conditions]);
 
   const handleBlurbTap = (conditionId: string) => {
     setExpandedBlurb(prev =>
@@ -176,9 +169,13 @@ function ExploreSection({
   };
 
   const handleNavigate = (conditionName: string) => {
-    const match = CONDITIONS.find(
-      c => c.name.toLowerCase() === conditionName.toLowerCase(),
-    ) ?? { id: conditionName.toLowerCase().replace(/\s/g, '_'), name: conditionName };
+    const match =
+      conditions.find(
+        c => c.name.toLowerCase() === conditionName.toLowerCase(),
+      ) ?? {
+        id: conditionName.toLowerCase().replace(/\s/g, '_'),
+        name: conditionName,
+      };
     onNavigateToCondition(match);
   };
 
@@ -609,11 +606,14 @@ function ConditionDetailView({
 // ─── Main Screen ──────────────────────────────────────────────
 
 export function ConditionsScreen() {
-  const [selected, setSelected] = useState<ConditionId | null>(
-    null,
-  );
-  const [language, setLanguage] =
-    useState<ConditionLanguageCode>('en');
+  const { memory, isLoaded } = useMemoryStore();
+  const [selected, setSelected] = useState<ConditionId | null>(null);
+  const [language, setLanguage] = useState<ConditionLanguageCode>('en');
+
+  const patientConditions: ConditionId[] = memory.conditions.map(name => ({
+    id: name.toLowerCase().replace(/\s+/g, '_'),
+    name,
+  }));
 
   if (selected) {
     return (
@@ -626,6 +626,25 @@ export function ConditionsScreen() {
     );
   }
 
+  if (isLoaded && patientConditions.length === 0) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <H2 style={styles.title}>My Conditions</H2>
+          <Card style={styles.emptyCard}>
+            <Body
+              color={colors.textSecondary}
+              style={styles.emptyText}
+            >
+              No conditions have been recorded yet. Ask your doctor
+              to update your profile.
+            </Body>
+          </Card>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
@@ -633,30 +652,23 @@ export function ConditionsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <H2 style={styles.title}>Mental Health Conditions</H2>
+        <H2 style={styles.title}>My Conditions</H2>
         <Body color={colors.textSecondary} style={styles.subtitle}>
-          Learn about common mental health conditions in simple
-          language.
+          Learn about your diagnosed conditions in simple language.
         </Body>
 
-        {/* Language selector for explore section */}
-        <LanguageDropdown
-          value={language}
-          onChange={setLanguage}
-        />
+        <LanguageDropdown value={language} onChange={setLanguage} />
 
-        {/* Ask or Explore */}
         <ExploreSection
           language={language}
+          conditions={patientConditions}
           onNavigateToCondition={setSelected}
         />
 
-        {/* Divider */}
         <View style={styles.divider} />
 
-        {/* Condition List */}
-        <Label style={styles.listTitle}>Common Conditions</Label>
-        {CONDITIONS.map(condition => (
+        <Label style={styles.listTitle}>Your Conditions</Label>
+        {patientConditions.map(condition => (
           <ConditionCard
             key={condition.id}
             condition={condition}
@@ -664,7 +676,6 @@ export function ConditionsScreen() {
           />
         ))}
 
-        {/* Disclaimer */}
         <Card style={styles.bottomDisclaimer}>
           <Caption
             color={colors.textTertiary}
@@ -854,4 +865,13 @@ const styles = StyleSheet.create({
   disclaimerTitle: { marginBottom: 0 },
   bottomDisclaimer: { marginTop: spacing.xs },
   disclaimerText: { lineHeight: 18, textAlign: 'center' },
+
+  emptyCard: {
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  emptyText: {
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });
